@@ -2996,6 +2996,16 @@ model* train(const problem *prob, const parameter *param)
 			Solver_MCSVM_CS Solver(&sub_prob, nr_class, weighted_C, param->eps);
 			Solver.Solve(model_->w);
 		}
+    else if(param->solver_type == MCSVM_WW)
+    {
+			model_->w=Malloc(double, n*nr_class);
+      printf("MCSVM_WW");
+    }
+    else if(param->solver_type == MCSVM_WW2)
+    {
+			model_->w=Malloc(double, n*nr_class);
+      printf("MCSVM_WW2");
+    }
 		else
 		{
 			if(nr_class == 2)
@@ -3678,6 +3688,8 @@ const char *check_parameter(const problem *prob, const parameter *param)
 		&& param->solver_type != L2R_L2LOSS_SVC
 		&& param->solver_type != L2R_L1LOSS_SVC_DUAL
 		&& param->solver_type != MCSVM_CS
+    && param->solver_type != MCSVM_WW
+    && param->solver_type != MCSVM_WW2
 		&& param->solver_type != L1R_L2LOSS_SVC
 		&& param->solver_type != L1R_LR
 		&& param->solver_type != L2R_LR_DUAL

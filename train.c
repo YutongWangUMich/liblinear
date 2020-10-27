@@ -31,6 +31,8 @@ void exit_with_help()
 	"	13 -- L2-regularized L1-loss support vector regression (dual)\n"
 	"  for outlier detection\n"
 	"	21 -- one-class support vector machine (dual)\n"
+  " 30 -- support vector classification by Weston and Watkins\n"
+  " 31 -- support vector classification by Weston and Watkins, Shark's implementation\n"
 	"-c cost : set the parameter C (default 1)\n"
 	"-p epsilon : set the epsilon in loss function of SVR (default 0.1)\n"
 	"-n nu : set the parameter nu of one-class SVM (default 0.5)\n"
@@ -357,6 +359,8 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 			case L2R_L2LOSS_SVC_DUAL:
 			case L2R_L1LOSS_SVC_DUAL:
 			case MCSVM_CS:
+      case MCSVM_WW:
+      case MCSVM_WW2:
 			case L2R_LR_DUAL:
 				param.eps = 0.1;
 				break;
