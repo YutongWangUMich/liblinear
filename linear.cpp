@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <locale.h>
+#include <float.h>
 #include "linear.h"
 #include "newton.h"
 int liblinear_version = LIBLINEAR_VERSION;
@@ -550,6 +551,181 @@ void l2r_l2_svr_fun::grad(double *w, double *g)
 	if(regularize_bias == 0)
 		g[w_size-1] -= w[w_size-1];
 }
+
+
+
+
+
+
+// A coordinate descent algorithm for
+// multi-class support vector machines by Weston and Watkins using reflection code theory
+//
+// UPDATE THIS!
+//  min_{\alpha}  0.5 \sum_m ||w_m(\alpha)||^2 + \sum_i \sum_m e^m_i alpha^m_i
+//    s.t.     \alpha^m_i <= C^m_i \forall m,i , \sum_m \alpha^m_i=0 \forall i
+//
+//  where e^m_i = 0 if y_i  = m,
+//        e^m_i = 1 if y_i != m,
+//  C^m_i = C if m  = y_i,
+//  C^m_i = 0 if m != y_i,
+//  and w_m(\alpha) = \sum_i \alpha^m_i x_i
+//
+// Given:
+// x, y, C
+// eps is the stopping tolerance
+//
+// solution will be put in w
+//
+
+class Solver_MCSVM_WW
+{
+  public:
+		Solver_MCSVM_WW(const problem *prob, int nr_class, double *C, double eps=0.1, int max_iter=100000);
+    ~Solver_MCSVM_WW();
+    void Solve(double *w);
+  private:
+		void solve_sub_problem(double A_i, int yi, double C_yi, int active_i, double *alpha_new);
+		double *C;
+		int w_size, l; // l is the number of instances
+		int nr_class;
+		int max_iter;
+		double eps;
+		const problem *prob;
+};
+
+
+Solver_MCSVM_WW::~Solver_MCSVM_WW()
+{
+}
+
+
+
+Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double *weighted_C, double eps, int max_iter)
+{
+	this->w_size = prob->n;
+	this->l = prob->l;
+	this->nr_class = nr_class;
+	this->eps = eps;
+	this->max_iter = max_iter;
+	this->prob = prob;
+	this->C = weighted_C;
+}
+
+void Solver_MCSVM_WW::solve_sub_problem(double A_i, int yi, double C_yi, int active_i, double *alpha_new){
+}
+
+void Solver_MCSVM_WW::Solve(double *w){
+  int i, s;
+  int iter = 0;
+  int idx;
+	double *alpha =  new double[l*(nr_class-1)];
+	double *alpha_new = new double[nr_class-1];
+  double *x_sq_norms = new double[l];
+  double *wxi = new double[nr_class-1];
+  double *v = new double[nr_class-1];
+  double *vl = new double[nr_class-1];
+  
+
+  // Compute the squared norms of all the samples
+  for(i=0;i<l;i++)
+  {
+    x_sq_norms[i] = 0;
+    const feature_node *xi = prob->x[i];
+    while(xi->index != -1)
+    {
+      double val = xi->value;
+      x_sq_norms[i] += val*val;
+      xi++;
+    }
+  }
+
+	// Initialize alpha
+	for(i=0;i<l*(nr_class-1);i++)
+		alpha[i] = 0;
+
+  // Initialize w
+  // We will use the last k-1 columns of w to store the reduced classifier
+  // The first column will be left as all zeros until the program finishes running
+	for(i=0;i<w_size*nr_class;i++)
+		w[i] = 0;
+
+  // outer loop
+  while(iter<3){
+
+    // inner loop
+    for(i=0;i<l;i++){
+      int yi = (int)prob->y[i];
+
+      // reset the wxi
+      for(s=0;s<nr_class-1;s++){
+        wxi[s] = 0;
+      }
+
+      const feature_node *xi = prob->x[i];
+      double nsxi = x_sq_norms[i];
+
+      // compute the k-1 dimension vector w'xi
+      for(; (idx=xi->index)!=-1;xi++){
+        for(s=0;s<nr_class-1;s++){
+          wxi[s] += w[(idx-1)*nr_class+s+1]*xi->value;
+        }
+      }
+
+
+      // compute v
+      for(s=0;s<nr_class-1;s++){
+        double rho;
+        // compute rho_{yi} * w'xi
+        if(yi==0){
+          rho = wxi[s];
+        }else{
+          if(yi-1==s){
+            rho = -wxi[s];
+          }else{
+            rho = wxi[s]-wxi[yi-1];
+          }
+        }
+        v[s] = (1.0- (0.5)*(rho-alpha[i*(nr_class-1)+s]*nsxi))/nsxi;
+      }
+
+
+
+      // solve the subproblem
+      double offset = v[0];
+
+      int nL = 0; // number of elmenets that are neither equal to C nor to 0
+      int nC = 0; // number of elements that are equal to C
+
+      double vL_sum = 0;
+
+      for(s=0;s<nr_class-1;s++)
+      {
+        if(v[s]-offset <= 0){
+          alpha_new[s] = 0;
+        }else if(v[s]-offset >= *C){
+          alpha_new[s] = *C;
+          nC++;
+        }else{
+          vL_sum += v[s];
+          nL++;
+        }
+      }
+      vL_sum += -nL*nC*(*C);
+
+      if(nL > 0){
+        for(s=0;s<nr_class-1;s++){
+          if(v[s]-offset>0 && v[s]-offset < *C){
+            alpha_new[s] = v[s] - nC*(*C) - vL_sum/(nL+1);
+          }
+        }
+      }
+    }
+    iter++;
+  }
+  
+}
+
+
 
 // A coordinate descent algorithm for
 // multi-class support vector machines by Crammer and Singer
@@ -2999,11 +3175,19 @@ model* train(const problem *prob, const parameter *param)
     else if(param->solver_type == MCSVM_WW)
     {
 			model_->w=Malloc(double, n*nr_class);
+			for(i=0;i<nr_class;i++)
+				for(j=start[i];j<start[i]+count[i];j++)
+					sub_prob.y[j] = i;
+			Solver_MCSVM_WW Solver(&sub_prob, nr_class, weighted_C, param->eps);
+			Solver.Solve(model_->w);
       printf("MCSVM_WW");
     }
     else if(param->solver_type == MCSVM_WW2)
     {
 			model_->w=Malloc(double, n*nr_class);
+			for(i=0;i<nr_class;i++)
+				for(j=start[i];j<start[i]+count[i];j++)
+					sub_prob.y[j] = i;
       printf("MCSVM_WW2");
     }
 		else
@@ -3343,7 +3527,9 @@ static const char *solver_type_table[]=
 	"", "", "",
 	"L2R_L2LOSS_SVR", "L2R_L2LOSS_SVR_DUAL", "L2R_L1LOSS_SVR_DUAL",
 	"", "", "", "", "", "", "",
-	"ONECLASS_SVM", NULL
+	"ONECLASS_SVM", 
+  "","","","","","","","",
+  "MCSVM_WW", "MCSVM_WW2", NULL
 };
 
 int save_model(const char *model_file_name, const struct model *model_)
@@ -3352,6 +3538,7 @@ int save_model(const char *model_file_name, const struct model *model_)
 	int nr_feature=model_->nr_feature;
 	int n;
 	const parameter& param = model_->param;
+  
 
 	if(model_->bias>=0)
 		n=nr_feature+1;
