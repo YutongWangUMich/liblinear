@@ -1,6 +1,12 @@
 To use the Weston-Watkins SVM, run 
 
-./train -s 30 data/mnist.scale
+./train -s 30 -c 100 data/mnist.scale
+
+./predict data/mnist.scale.t mnist.scale.model output
+
+To train Crammer Singer
+
+./train -s 4 data/mnist.scale
 
 ./predict data/mnist.scale.t mnist.scale.model output
 

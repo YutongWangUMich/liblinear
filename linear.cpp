@@ -580,12 +580,12 @@ void l2r_l2_svr_fun::grad(double *w, double *g)
 class Solver_MCSVM_WW
 {
   public:
-		Solver_MCSVM_WW(const problem *prob, int nr_class, double *C, double eps=0.1, int max_iter=100000);
+		Solver_MCSVM_WW(const problem *prob, int nr_class, double C, double eps=0.1, int max_iter=100000);
     ~Solver_MCSVM_WW();
     void Solve(double *w);
   private:
-		void solve_sub_problem(double A_i, int yi, double C_yi, int active_i, double *alpha_new);
-		double *C;
+		void solve_sub_problem(double * v, double * alpha_new);
+		double C;
 		int w_size, l; // l is the number of instances
 		int nr_class;
 		int max_iter;
@@ -600,7 +600,7 @@ Solver_MCSVM_WW::~Solver_MCSVM_WW()
 
 
 
-Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double *weighted_C, double eps, int max_iter)
+Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double C, double eps, int max_iter)
 {
 	this->w_size = prob->n;
 	this->l = prob->l;
@@ -608,24 +608,189 @@ Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double *weig
 	this->eps = eps;
 	this->max_iter = max_iter;
 	this->prob = prob;
-	this->C = weighted_C;
+	this->C = C;
 }
 
-void Solver_MCSVM_WW::solve_sub_problem(double A_i, int yi, double C_yi, int active_i, double *alpha_new){
+struct ind_tuple{
+  double val;
+  int idx;
+};
+
+int compare2(const void * a, const void * b)
+{
+  ind_tuple *A = (ind_tuple *)a;
+  ind_tuple *B = (ind_tuple *)b;
+  if( B->val < A->val) return -1;
+  if( B->val > A->val) return 1;
+  return 0;
+}
+
+template <class T>
+void print_array(T * v, int length){
+  printf("[");
+  for(int i = 0; i< length -1; i++){
+    printf("%f,", v[i]);
+  }
+  printf("%f]\n", v[length-1]);
+}
+
+
+int * argsort(double *v, int length){
+  ind_tuple * vv = new ind_tuple[length];
+  for(int i = 0; i < length; i++){
+    vv[i].val = v[i];
+    vv[i].idx = i;
+  }
+  qsort(vv,length, sizeof(ind_tuple), compare2);
+  int * idx = new int[length];
+  for(int i =0; i < length; i++){
+    idx[i] = vv[i].idx;
+  }
+  return idx;
+}
+
+
+void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
+
+  int i;
+
+  int l = nr_class;
+
+  int z1 = 0, z2 = 0, idx_C = -1, num_C = 0;
+  int tb;
+
+  int kkt1, kkt2;
+
+  int num_L1, num_L2;
+
+  double offset;
+
+  double * vals_unsrt = new double[2*(l-1)];
+  for(i=0;i<l-1;i++){
+    vals_unsrt[i] = v[i];
+    vals_unsrt[i+(l-1)] = v[i]-C;
+  }
+
+  int * vdx = argsort(v,l-1);
+
+  int * idx = argsort(vals_unsrt, 2*(l-1));
+
+  double sum_vL1 = 0;
+  double sum_vL2 = 0;
+  double sum_alpha1;
+  double sum_alpha2;
+
+  for(i=0;i<2*(l-1);i++){
+    if(idx[i] >= l-1){
+      tb = 1;
+    }else{
+      tb = 0;
+    }
+
+    if(tb==1){
+      offset = v[vdx[idx[i]-l+1]];
+    }else{
+      offset = v[vdx[idx[i]]];
+    }
+
+    while((z1 < l-1) && (v[vdx[z1]] - offset + tb*C > 0)){
+      sum_vL1 += v[vdx[z1]];
+      z1++;
+    }
+
+    while((z2 < l-1) && (v[vdx[z2]] - offset + tb*C >= 0)){
+      sum_vL2 += v[vdx[z2]];
+      z2++;
+    }
+
+    while((idx_C < l-2) && (v[vdx[idx_C+1]] - offset + tb*C >= C)){
+      idx_C++;
+      num_C++;
+      sum_vL1 -= v[vdx[idx_C]];
+      sum_vL2 -= v[vdx[idx_C]];
+    }
+
+    num_L1 = z1 - idx_C - 1;
+    num_L2 = z2 - idx_C - 1;
+
+    sum_alpha1 = sum_vL1 - num_L1*(sum_vL1+num_C*C)/(num_L1+1) + num_C*C;
+    sum_alpha2 = sum_vL2 - num_L2*(sum_vL2+num_C*C)/(num_L2+1) + num_C*C;
+
+    kkt1 = 1;
+    if(num_L1>0){
+        kkt1 *= C>=(v[vdx[idx_C+1]]- (sum_vL1+num_C*C)/(num_L1+1));
+        kkt1 *= (v[vdx[z1-1]]- (sum_vL1+num_C*C)/(num_L1+1))>=0;
+    }
+    if(z1 < l-1){
+        kkt1 *= (sum_alpha1>= v[vdx[z1]]);
+    }
+    if(idx_C > 0){
+        kkt1 *= (C + sum_alpha1<= v[vdx[idx_C]]);
+    }
+
+    kkt2 = 1;
+    if(num_L2>0){
+        kkt2 *= C>=(v[vdx[idx_C+1]]- (sum_vL2+num_C*C)/(num_L2+1));
+        kkt2 *= (v[vdx[z2-1]]- (sum_vL2+num_C*C)/(num_L2+1))>=0;
+    }
+    if(z2 < l-1){
+        kkt2 *= (sum_alpha2>= v[vdx[z2]]);
+    }
+    if(idx_C > 0){
+        kkt2 *= (C + sum_alpha2<= v[vdx[idx_C]]);
+    }
+
+    if(kkt1 == 1){
+      for(int j =0; j< l-1; j++){
+        if(j<= idx_C){
+          alpha_new[vdx[j]] = C;
+        }else if(j<z1){
+          alpha_new[vdx[j]] = v[vdx[j]] -  (sum_vL1+num_C*C)/(num_L1+1);
+
+          if(kkt1 == 1){
+          }
+        }else{
+          alpha_new[vdx[j]] = 0;
+        }
+      }
+      return;
+    }
+
+
+
+    if(kkt2 == 1){
+      for(int j =0; j< l-1; j++){
+        if(j<= idx_C){
+          alpha_new[vdx[j]] = C;
+        }else if(j<z2){
+          alpha_new[vdx[j]] = v[vdx[j]] -  (sum_vL2+num_C*C)/(num_L2+1);
+
+          if(kkt1 == 1){
+          }
+        }else{
+          alpha_new[vdx[j]] = 0;
+        }
+      }
+      return;
+    }
+  }
 }
 
 void Solver_MCSVM_WW::Solve(double *w){
-  int i, s;
+  int i, s,j;
   int iter = 0;
   int idx;
 	double *alpha =  new double[l*(nr_class-1)];
 	double *alpha_new = new double[nr_class-1];
+  double *del_alpha = new double[nr_class-1];
+  double sum_del_alpha;
+
   double *x_sq_norms = new double[l];
   double *wxi = new double[nr_class-1];
   double *v = new double[nr_class-1];
   double *vl = new double[nr_class-1];
-  
 
+  const feature_node *xi;
   // Compute the squared norms of all the samples
   for(i=0;i<l;i++)
   {
@@ -638,6 +803,13 @@ void Solver_MCSVM_WW::Solve(double *w){
       xi++;
     }
   }
+	int *index = new int[l];
+	for(i=0;i<l;i++)
+	{
+		index[i] = i;
+	}
+
+ floating point exception 
 
 	// Initialize alpha
 	for(i=0;i<l*(nr_class-1);i++)
@@ -650,10 +822,18 @@ void Solver_MCSVM_WW::Solve(double *w){
 		w[i] = 0;
 
   // outer loop
-  while(iter<3){
+  while(iter<4){
+
+    // shuffle indices
+		for(i=0;i<2*l;i++)
+		{
+			j = i+rand()%(l-i);
+			swap(index[i], index[j]);
+		}
 
     // inner loop
-    for(i=0;i<l;i++){
+    for(j=0;j<l;j++){
+      i = index[j];
       int yi = (int)prob->y[i];
 
       // reset the wxi
@@ -661,11 +841,10 @@ void Solver_MCSVM_WW::Solve(double *w){
         wxi[s] = 0;
       }
 
-      const feature_node *xi = prob->x[i];
       double nsxi = x_sq_norms[i];
 
       // compute the k-1 dimension vector w'xi
-      for(; (idx=xi->index)!=-1;xi++){
+      for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
         for(s=0;s<nr_class-1;s++){
           wxi[s] += w[(idx-1)*nr_class+s+1]*xi->value;
         }
@@ -687,42 +866,42 @@ void Solver_MCSVM_WW::Solve(double *w){
         }
         v[s] = (1.0- (0.5)*(rho-alpha[i*(nr_class-1)+s]*nsxi))/nsxi;
       }
+      /* print_array<double>(v,nr_class-1); */
 
+      solve_sub_problem(v,alpha_new);
+      /* print_array<double>(alpha_new,nr_class-1); */
 
+      sum_del_alpha = 0;
+      for(s=0;s<nr_class-1;s++){
+        del_alpha[s] = alpha_new[s]-alpha[i*(nr_class-1)+s];
+        sum_del_alpha += del_alpha[s];
+      }
+      if(yi>0){
+        del_alpha[yi-1] = -sum_del_alpha;
+      }
+      /* print_array<double>(del_alpha,nr_class-1); */
+      double sum_dd=0;
+      for(s=0;s<nr_class-1;s++){
+        sum_dd += del_alpha[s];
+      }
+      
 
-      // solve the subproblem
-      double offset = v[0];
-
-      int nL = 0; // number of elmenets that are neither equal to C nor to 0
-      int nC = 0; // number of elements that are equal to C
-
-      double vL_sum = 0;
-
-      for(s=0;s<nr_class-1;s++)
-      {
-        if(v[s]-offset <= 0){
-          alpha_new[s] = 0;
-        }else if(v[s]-offset >= *C){
-          alpha_new[s] = *C;
-          nC++;
-        }else{
-          vL_sum += v[s];
-          nL++;
+      for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
+        for(s=0;s<nr_class-1;s++){
+          w[(idx-1)*nr_class+s+1] += xi->value*(del_alpha[s]+sum_dd);
+          /* printf("%f",w[(idx-1)*nr_class+s+1]); */
         }
       }
-      vL_sum += -nL*nC*(*C);
-
-      if(nL > 0){
-        for(s=0;s<nr_class-1;s++){
-          if(v[s]-offset>0 && v[s]-offset < *C){
-            alpha_new[s] = v[s] - nC*(*C) - vL_sum/(nL+1);
-          }
-        }
+      for(s=0;s<nr_class-1;s++){
+        alpha[i*(nr_class-1)+s] = alpha_new[s];
       }
     }
     iter++;
   }
+	for(i=0;i<w_size*nr_class;i++)
+		w[i] *=-1;
   
+  /* print_array<double>(w,w_size*nr_class); */
 }
 
 
@@ -3178,7 +3357,8 @@ model* train(const problem *prob, const parameter *param)
 			for(i=0;i<nr_class;i++)
 				for(j=start[i];j<start[i]+count[i];j++)
 					sub_prob.y[j] = i;
-			Solver_MCSVM_WW Solver(&sub_prob, nr_class, weighted_C, param->eps);
+      printf("value of C is: %f\n",param->C);
+			Solver_MCSVM_WW Solver(&sub_prob, nr_class, param->C, param->eps);
 			Solver.Solve(model_->w);
       printf("MCSVM_WW");
     }
