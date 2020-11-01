@@ -1,14 +1,38 @@
-To use the Weston-Watkins SVM, run 
+- MNIST
 
-./train -s 30 -c 100 data/mnist.scale
+-- To use the Weston-Watkins SVM, run 
+
+./train -s 30 -c 0.00001 data/mnist.scale
 
 ./predict data/mnist.scale.t mnist.scale.model output
 
-To train Crammer Singer
+-- To train Crammer Singer
 
 ./train -s 4 data/mnist.scale
 
 ./predict data/mnist.scale.t mnist.scale.model output
+
+
+- USPS
+
+-- To use the Weston-Watkins SVM, run 
+
+./train -s 30 -c .1 data/usps
+
+./predict data/usps.t usps.model output
+
+-- To train Crammer Singer
+
+./train -s 4 data/usps
+
+./predict data/usps.t usps.model output
+
+
+
+./train -s 30 -c 1 data/toy
+
+./predict data/toy toy.model output
+
 
 
 ORIGINAL LIBLINEAR README

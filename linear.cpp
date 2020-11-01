@@ -686,12 +686,15 @@ void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
     }else{
       tb = 0;
     }
+    /* printf("tb: %d\n", tb); */
 
     if(tb==1){
-      offset = v[vdx[idx[i]-l+1]];
+      /* offset = v[vdx[idx[i]-l+1]]; */
+      offset = v[idx[i]-l+1];
     }else{
-      offset = v[vdx[idx[i]]];
+      offset = v[idx[i]];
     }
+    /* printf("offset: %f\n", offset); */
 
     while((z1 < l-1) && (v[vdx[z1]] - offset + tb*C > 0)){
       sum_vL1 += v[vdx[z1]];
@@ -702,6 +705,7 @@ void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
       sum_vL2 += v[vdx[z2]];
       z2++;
     }
+    /* printf("z1: %d, z2: %d\n", z1,z2); */
 
     while((idx_C < l-2) && (v[vdx[idx_C+1]] - offset + tb*C >= C)){
       idx_C++;
@@ -739,6 +743,8 @@ void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
     if(idx_C > 0){
         kkt2 *= (C + sum_alpha2<= v[vdx[idx_C]]);
     }
+    /* printf("idx_C: %d\n", idx_C); */
+    /* printf("kkt1: %d, kkt2: %d\n", kkt1,kkt2); */
 
     if(kkt1 == 1){
       for(int j =0; j< l-1; j++){
@@ -755,8 +761,6 @@ void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
       }
       return;
     }
-
-
 
     if(kkt2 == 1){
       for(int j =0; j< l-1; j++){
@@ -782,20 +786,21 @@ void Solver_MCSVM_WW::Solve(double *w){
   int idx;
 	double *alpha =  new double[l*(nr_class-1)];
 	double *alpha_new = new double[nr_class-1];
+  double *alpha_old = new double[nr_class-1];
   double *del_alpha = new double[nr_class-1];
   double sum_del_alpha;
 
   double *x_sq_norms = new double[l];
   double *wxi = new double[nr_class-1];
   double *v = new double[nr_class-1];
-  double *vl = new double[nr_class-1];
 
   const feature_node *xi;
+
   // Compute the squared norms of all the samples
   for(i=0;i<l;i++)
   {
     x_sq_norms[i] = 0;
-    const feature_node *xi = prob->x[i];
+    xi = prob->x[i];
     while(xi->index != -1)
     {
       double val = xi->value;
@@ -809,12 +814,12 @@ void Solver_MCSVM_WW::Solve(double *w){
 		index[i] = i;
 	}
 
- floating point exception 
 
 	// Initialize alpha
 	for(i=0;i<l*(nr_class-1);i++)
 		alpha[i] = 0;
 
+  /* printf("Number of features: %d\n", w_size); */
   // Initialize w
   // We will use the last k-1 columns of w to store the reduced classifier
   // The first column will be left as all zeros until the program finishes running
@@ -822,10 +827,10 @@ void Solver_MCSVM_WW::Solve(double *w){
 		w[i] = 0;
 
   // outer loop
-  while(iter<4){
+  while(iter<10){
 
     // shuffle indices
-		for(i=0;i<2*l;i++)
+		for(i=0;i<l;i++)
 		{
 			j = i+rand()%(l-i);
 			swap(index[i], index[j]);
@@ -833,15 +838,25 @@ void Solver_MCSVM_WW::Solve(double *w){
 
     // inner loop
     for(j=0;j<l;j++){
+      /* printf("> %d-th sample\n",j); */
+      /* if(j>10){ */
+      /*   exit(0); */
+      /* } */
       i = index[j];
       int yi = (int)prob->y[i];
+      /* printf("label: %d, feature: ", yi); */
+      /* for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){ */
+      /*   printf("%f, ", xi->value); */
+      /* } */
+      /* printf("\n"); */
 
-      // reset the wxi
+      /* exit(0); */
+
+      // reset the wxi, populate the old alpha
       for(s=0;s<nr_class-1;s++){
         wxi[s] = 0;
       }
 
-      double nsxi = x_sq_norms[i];
 
       // compute the k-1 dimension vector w'xi
       for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
@@ -851,6 +866,7 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
 
 
+      double nsxi = x_sq_norms[i];
       // compute v
       for(s=0;s<nr_class-1;s++){
         double rho;
@@ -866,9 +882,12 @@ void Solver_MCSVM_WW::Solve(double *w){
         }
         v[s] = (1.0- (0.5)*(rho-alpha[i*(nr_class-1)+s]*nsxi))/nsxi;
       }
+      /* printf("v: "); */
       /* print_array<double>(v,nr_class-1); */
 
       solve_sub_problem(v,alpha_new);
+
+      /* printf("alpha_new: "); */
       /* print_array<double>(alpha_new,nr_class-1); */
 
       sum_del_alpha = 0;
@@ -887,6 +906,7 @@ void Solver_MCSVM_WW::Solve(double *w){
       
 
       for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
+        /* printf("%d,",idx); */
         for(s=0;s<nr_class-1;s++){
           w[(idx-1)*nr_class+s+1] += xi->value*(del_alpha[s]+sum_dd);
           /* printf("%f",w[(idx-1)*nr_class+s+1]); */
@@ -895,12 +915,14 @@ void Solver_MCSVM_WW::Solve(double *w){
       for(s=0;s<nr_class-1;s++){
         alpha[i*(nr_class-1)+s] = alpha_new[s];
       }
+      /* printf("\n"); */
     }
     iter++;
   }
 	for(i=0;i<w_size*nr_class;i++)
 		w[i] *=-1;
   
+
   /* print_array<double>(w,w_size*nr_class); */
 }
 
@@ -3326,7 +3348,7 @@ model* train(const problem *prob, const parameter *param)
 				weighted_C[j] *= param->weight[i];
 		}
 
-		// constructing the subproblem
+		// constructing the subproblem, NO SHUFFLE HERE
 		feature_node **x = Malloc(feature_node *,l);
 		for(i=0;i<l;i++)
 			x[i] = prob->x[perm[i]];
@@ -3340,6 +3362,18 @@ model* train(const problem *prob, const parameter *param)
 
 		for(k=0; k<sub_prob.l; k++)
 			sub_prob.x[k] = x[k];
+    
+    // Print the data for diagnostic purposes
+    /* for(i=0;i<l;i++){ */
+    /*   const feature_node *xi; */
+    /*   int idx; */
+    /*   int yi = (int)sub_prob.y[i]; */
+    /*   printf("ith sample: %d, label: %d, feature: ", i, yi); */
+    /*   for(xi = sub_prob.x[i]; (idx=xi->index)!=-1;xi++){ */
+    /*     printf("%f, ", xi->value); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
 
 		// multi-class svm by Crammer and Singer
 		if(param->solver_type == MCSVM_CS)
@@ -3348,6 +3382,8 @@ model* train(const problem *prob, const parameter *param)
 			for(i=0;i<nr_class;i++)
 				for(j=start[i];j<start[i]+count[i];j++)
 					sub_prob.y[j] = i;
+
+
 			Solver_MCSVM_CS Solver(&sub_prob, nr_class, weighted_C, param->eps);
 			Solver.Solve(model_->w);
 		}
@@ -3359,8 +3395,9 @@ model* train(const problem *prob, const parameter *param)
 					sub_prob.y[j] = i;
       printf("value of C is: %f\n",param->C);
 			Solver_MCSVM_WW Solver(&sub_prob, nr_class, param->C, param->eps);
+
 			Solver.Solve(model_->w);
-      printf("MCSVM_WW");
+      printf("MCSVM_WW\n");
     }
     else if(param->solver_type == MCSVM_WW2)
     {
@@ -3624,6 +3661,7 @@ double predict_values(const struct model *model_, const struct feature_node *x, 
 	else
 		nr_w = nr_class;
 
+
 	const feature_node *lx=x;
 	for(i=0;i<nr_w;i++)
 		dec_values[i] = 0;
@@ -3634,6 +3672,22 @@ double predict_values(const struct model *model_, const struct feature_node *x, 
 			for(i=0;i<nr_w;i++)
 				dec_values[i] += w[(idx-1)*nr_w+i]*lx->value;
 	}
+
+  /* lx = x; */
+  /* printf("fvec: "); */
+	/* for(; (idx=lx->index)!=-1; lx++) */
+	/* { */
+		/* // the dimension of testing data may exceed that of training */
+		/* if(idx<=n) */
+				/* printf("%d:%f, ",lx->index,lx->value); */
+	/* } */
+  /* printf("\n"); */
+  
+  /* printf("decv: "); */
+	/* for(i=0;i<nr_w;i++) */
+  /*   printf("%d: %f, ", i, dec_values[i]); */
+  /* printf("\n"); */
+
 	if(check_oneclass_model(model_))
 		dec_values[0] -= model_->rho;
 
