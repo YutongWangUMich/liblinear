@@ -3362,7 +3362,7 @@ model* train(const problem *prob, const parameter *param)
 
 		for(k=0; k<sub_prob.l; k++)
 			sub_prob.x[k] = x[k];
-    
+
 		// multi-class svm by Crammer and Singer
 		if(param->solver_type == MCSVM_CS)
 		{
