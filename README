@@ -2,7 +2,7 @@
 
 -- To use the Weston-Watkins SVM, run 
 
-./train -s 30 -c 0.00001 data/mnist.scale
+./train -s 30 -c 1 data/mnist.scale
 
 ./predict data/mnist.scale.t mnist.scale.model output
 
@@ -28,10 +28,33 @@
 ./predict data/usps.t usps.model output
 
 
+- CIFAR10
+
+WW 
+./train -s 30 -c .1 data/cifar10
+
+./predict data/cifar10.t cifar10.model output
+
+CS
+
+./train -s 4 data/cifar10
+
+./predict data/cifar10.t cifar10.model output
+
+
 
 ./train -s 30 -c 1 data/toy
 
 ./predict data/toy toy.model output
+
+
+./train -s 30 -c 1 data/dna.scale
+
+./predict data/dna.scale.t dna.scale.model output
+
+./train -s 4 -c 1 data/dna.scale
+
+./predict data/dna.scale.t dna.scale.model output
 
 
 

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <locale.h>
-#include <float.h>
 #include "linear.h"
 #include "newton.h"
 int liblinear_version = LIBLINEAR_VERSION;
@@ -917,6 +916,7 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
       /* printf("\n"); */
     }
+    info(".");
     iter++;
   }
 	for(i=0;i<w_size*nr_class;i++)
@@ -3348,7 +3348,7 @@ model* train(const problem *prob, const parameter *param)
 				weighted_C[j] *= param->weight[i];
 		}
 
-		// constructing the subproblem, NO SHUFFLE HERE
+		// constructing the subproblem
 		feature_node **x = Malloc(feature_node *,l);
 		for(i=0;i<l;i++)
 			x[i] = prob->x[perm[i]];
@@ -3363,18 +3363,6 @@ model* train(const problem *prob, const parameter *param)
 		for(k=0; k<sub_prob.l; k++)
 			sub_prob.x[k] = x[k];
     
-    // Print the data for diagnostic purposes
-    /* for(i=0;i<l;i++){ */
-    /*   const feature_node *xi; */
-    /*   int idx; */
-    /*   int yi = (int)sub_prob.y[i]; */
-    /*   printf("ith sample: %d, label: %d, feature: ", i, yi); */
-    /*   for(xi = sub_prob.x[i]; (idx=xi->index)!=-1;xi++){ */
-    /*     printf("%f, ", xi->value); */
-    /*   } */
-    /*   printf("\n"); */
-    /* } */
-
 		// multi-class svm by Crammer and Singer
 		if(param->solver_type == MCSVM_CS)
 		{
@@ -3382,8 +3370,6 @@ model* train(const problem *prob, const parameter *param)
 			for(i=0;i<nr_class;i++)
 				for(j=start[i];j<start[i]+count[i];j++)
 					sub_prob.y[j] = i;
-
-
 			Solver_MCSVM_CS Solver(&sub_prob, nr_class, weighted_C, param->eps);
 			Solver.Solve(model_->w);
 		}
@@ -3395,9 +3381,7 @@ model* train(const problem *prob, const parameter *param)
 					sub_prob.y[j] = i;
       printf("value of C is: %f\n",param->C);
 			Solver_MCSVM_WW Solver(&sub_prob, nr_class, param->C, param->eps);
-
 			Solver.Solve(model_->w);
-      printf("MCSVM_WW\n");
     }
     else if(param->solver_type == MCSVM_WW2)
     {
@@ -3672,22 +3656,6 @@ double predict_values(const struct model *model_, const struct feature_node *x, 
 			for(i=0;i<nr_w;i++)
 				dec_values[i] += w[(idx-1)*nr_w+i]*lx->value;
 	}
-
-  /* lx = x; */
-  /* printf("fvec: "); */
-	/* for(; (idx=lx->index)!=-1; lx++) */
-	/* { */
-		/* // the dimension of testing data may exceed that of training */
-		/* if(idx<=n) */
-				/* printf("%d:%f, ",lx->index,lx->value); */
-	/* } */
-  /* printf("\n"); */
-  
-  /* printf("decv: "); */
-	/* for(i=0;i<nr_w;i++) */
-  /*   printf("%d: %f, ", i, dec_values[i]); */
-  /* printf("\n"); */
-
 	if(check_oneclass_model(model_))
 		dec_values[0] -= model_->rho;
 
@@ -3772,7 +3740,6 @@ int save_model(const char *model_file_name, const struct model *model_)
 	int nr_feature=model_->nr_feature;
 	int n;
 	const parameter& param = model_->param;
-  
 
 	if(model_->bias>=0)
 		n=nr_feature+1;
