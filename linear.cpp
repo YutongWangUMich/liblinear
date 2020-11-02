@@ -3645,7 +3645,6 @@ double predict_values(const struct model *model_, const struct feature_node *x, 
 	else
 		nr_w = nr_class;
 
-
 	const feature_node *lx=x;
 	for(i=0;i<nr_w;i++)
 		dec_values[i] = 0;
