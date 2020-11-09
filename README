@@ -1,61 +1,60 @@
+- CIFAR10
+
+./train -s 30 -c .1 -t 10 data/cifar10
+./predict data/cifar10.t cifar10.model output
+./train -s 31 -c .1 -t 10 data/cifar10
+./predict data/cifar10.t cifar10.model output
+
+
 - MNIST
 
--- To use the Weston-Watkins SVM, run 
-
-./train -s 30 -c 1 data/mnist.scale
-
+./train -s 30 -c 1 -t 9 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
-
--- To train Crammer Singer
-
-./train -s 4 data/mnist.scale
-
+./train -s 31 -c 1 -t 100 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
 
 
 - USPS
 
--- To use the Weston-Watkins SVM, run 
-
-./train -s 30 -c .1 data/usps
-
+./train -s 30 -c 1000 -t 3 data/usps
 ./predict data/usps.t usps.model output
-
--- To train Crammer Singer
-
-./train -s 4 data/usps
-
+./train -s 31 -c 1000 -t 1000 data/usps
 ./predict data/usps.t usps.model output
 
 
-- CIFAR10
+- toy
 
-WW 
-./train -s 30 -c .1 data/cifar10
-
-./predict data/cifar10.t cifar10.model output
-
-CS
-
-./train -s 4 data/cifar10
-
-./predict data/cifar10.t cifar10.model output
-
-
-
-./train -s 30 -c 1 data/toy
-
+./train -s 30 -c .1 -t 100 data/toy
+./predict data/toy toy.model output
+./train -s 31 -c .1 -t 1000 data/toy
 ./predict data/toy toy.model output
 
 
-./train -s 30 -c 1 data/dna.scale
+- dna.scale
 
+./train -s 30 -c .1 -t 100 data/dna.scale
 ./predict data/dna.scale.t dna.scale.model output
+./train -s 31 -c .1 -t 1000 data/dna.scale
+./predict data/dna.scale.t dna.scale.model output
+
 
 ./train -s 4 -c 1 data/dna.scale
-
 ./predict data/dna.scale.t dna.scale.model output
 
 
+./train -s 30 -c 1 -t 16 data/news20
+./predict data/news20.t news20.model output
+./train -s 31 -c 1 -t 64 data/news20
+./predict data/news20.t news20.model output
 
-ORIGINAL LIBLINEAR README
+
+
+./train -s 30 -c .1 -t 100 data/pendigits
+./predict data/pendigits.t pendigits.model output
+./train -s 31 -c .1 -t 10000 data/pendigits
+./predict data/pendigits.t pendigits.model output
+
+./train -s 30 -c .1 -t 100 data/satimage.scale
+./predict data/satimage.scale.t satimage.scale.model output
+./train -s 31 -c .1 -t 1000 data/satimage.scale
+./predict data/satimage.scale.t satimage.scale.model output

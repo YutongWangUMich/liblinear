@@ -23,7 +23,7 @@ struct problem
 	double bias;            /* < 0 if no bias term */
 };
 
-enum { L2R_LR, L2R_L2LOSS_SVC_DUAL, L2R_L2LOSS_SVC, L2R_L1LOSS_SVC_DUAL, MCSVM_CS, L1R_L2LOSS_SVC, L1R_LR, L2R_LR_DUAL, L2R_L2LOSS_SVR = 11, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL, ONECLASS_SVM = 21, MCSVM_WW = 30, MCSVM_WW2 = 31}; /* solver_type */
+enum { L2R_LR, L2R_L2LOSS_SVC_DUAL, L2R_L2LOSS_SVC, L2R_L1LOSS_SVC_DUAL, MCSVM_CS, L1R_L2LOSS_SVC, L1R_LR, L2R_LR_DUAL, L2R_L2LOSS_SVR = 11, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL, ONECLASS_SVM = 21, MCSVM_WW = 30, MCSVM_WW_Shark = 31}; /* solver_type */
 
 struct parameter
 {
@@ -39,6 +39,7 @@ struct parameter
 	double nu;
 	double *init_sol;
 	int regularize_bias;
+  int max_iter;
 };
 
 struct model
