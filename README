@@ -1,16 +1,16 @@
 - CIFAR10
 
-./train -s 30 -c .1 -t 10 data/cifar10
+./train -s 30 -c 1 -t 1000 data/cifar10
 ./predict data/cifar10.t cifar10.model output
-./train -s 31 -c .1 -t 10 data/cifar10
+./train -s 31 -c 1 -t 1000 data/cifar10
 ./predict data/cifar10.t cifar10.model output
 
 
 - MNIST
 
-./train -s 30 -c 1 -t 9 data/mnist.scale
+./train -s 30 -c .1 -t 64 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
-./train -s 31 -c 1 -t 100 data/mnist.scale
+./train -s 31 -c .1 -t 64 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
 
 
