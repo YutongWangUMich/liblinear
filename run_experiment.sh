@@ -5,14 +5,16 @@
 # DATASETNAME="pendigits"
 # DATASETNAME="news20.scale"
 # DATASETNAME="sector.scale"
-# DATASETNAME="mnist.scale"
-DATASETNAME="cifar10"
+DATASETNAME="mnist.scale"
+# DATASETNAME="cifar10"
+# DATASETNAME="toy"
 
-REG=0.00000001
+REG=.01
+# REG=0.000000001
 ITER=1
 FILENAME="results/${DATASETNAME}_RC"
 echo $DATASETNAME > $FILENAME
-for i in {1..6}
+for i in {1..10}
   do
     echo $ITER
     ./train -s 30 -c $REG -t $ITER data/$DATASETNAME >> $FILENAME
@@ -25,7 +27,7 @@ for i in {1..6}
 ITER=1
 FILENAME="results/${DATASETNAME}_Shark"
 echo $DATASETNAME > $FILENAME
-for i in {1..6}
+for i in {1..10}
   do
     echo $ITER
     ./train -s 31 -c $REG -t $ITER data/$DATASETNAME >> $FILENAME

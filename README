@@ -1,6 +1,6 @@
 - CIFAR10
 
-./train -s 30 -c 1 -t 1000 data/cifar10
+./train -s 30 -c 0.000000001 -t 16 data/cifar10
 ./predict data/cifar10.t cifar10.model output
 ./train -s 31 -c 1 -t 1000 data/cifar10
 ./predict data/cifar10.t cifar10.model output
@@ -8,7 +8,7 @@
 
 - MNIST
 
-./train -s 30 -c .1 -t 64 data/mnist.scale
+./train -s 30 -c 1 -t 64 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
 ./train -s 31 -c .1 -t 64 data/mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
@@ -16,7 +16,7 @@
 
 - USPS
 
-./train -s 30 -c 1000 -t 3 data/usps
+./train -s 30 -c 1 -t 16 data/usps
 ./predict data/usps.t usps.model output
 ./train -s 31 -c 1000 -t 1000 data/usps
 ./predict data/usps.t usps.model output
@@ -24,7 +24,7 @@
 
 - toy
 
-./train -s 30 -c .1 -t 100 data/toy
+./train -s 30 -c 1 -t 100 data/toy
 ./predict data/toy toy.model output
 ./train -s 31 -c .1 -t 1000 data/toy
 ./predict data/toy toy.model output
@@ -47,6 +47,9 @@
 ./train -s 31 -c 1 -t 64 data/news20
 ./predict data/news20.t news20.model output
 
+
+./train -s 30 -c 1 -t 16 data/news20.scale
+./predict data/news20.scale.t news20.scale.model output
 
 
 ./train -s 30 -c .1 -t 100 data/pendigits
