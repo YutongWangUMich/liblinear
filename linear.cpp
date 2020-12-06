@@ -929,11 +929,11 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
       /* printf("%d\n", num_negs); */
 
-      /* if(iter > 2){ */
-      /* printf("=====iteration: %d\n", j); */
-      /* printf("%f\nv: \t\t", nsxi); */
-      /* print_array<double>(v,nr_class-1); */
-      /* } */
+      if(iter > 2){
+      printf("=====iteration: %d\n", j);
+      printf("%f\nv: \t\t", nsxi);
+      print_array<double>(v,nr_class-1);
+      }
 
       if(is_zero){
         for(s = 0; s<nr_class-1;s++){
@@ -945,11 +945,11 @@ void Solver_MCSVM_WW::Solve(double *w){
         solve_sub_problem(v,alpha_new);
       }
 
-      /* if(iter > 2){ */
-      /*   printf("alpha_new: \t"); */
-      /*   print_array<double>(alpha_new,nr_class-1); */
-      /*   if(j>10) exit(0); */
-      /* } */
+      if(iter > 2){
+        printf("alpha_new: \t");
+        print_array<double>(alpha_new,nr_class-1);
+        if(j>10) exit(0);
+      }
 
 
       sum_del_alpha = 0;
