@@ -11,7 +11,7 @@
 #include "newton.h"
 int liblinear_version = LIBLINEAR_VERSION;
 typedef signed char schar;
-template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
+template <class T> static inline void my_swap(T& x, T& y) { T t=x; x=y; y=t; }
 #ifndef min
 template <class T> static inline T min(T x,T y) { return (x<y)?x:y; }
 #endif
@@ -26,6 +26,7 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 
 #define TRACE
 /* #define SHARK_FIX */
+/* #define DIAGNOSTIC2 */
 
 
 #define INF HUGE_VAL
@@ -636,6 +637,22 @@ double calc_WW_primal_obj(
 // solution will be put in w
 //
 
+struct id_tuple{
+  double val;
+  int idx;
+};
+
+struct up_tuple{
+  double val;
+  bool up;
+};
+
+template<class T>
+bool compareVal(const T &a, const T &b)
+{
+    return a.val > b.val;
+}
+
 class Solver_MCSVM_WW
 {
   public:
@@ -644,21 +661,6 @@ class Solver_MCSVM_WW
     void Solve(double *w);
   private:
 
-    struct id_tuple{
-      double val;
-      int idx;
-    };
-
-    struct up_tuple{
-      double val;
-      bool up;
-    };
-
-    template<class T>
-    bool compareVal(const T &a, const T &b)
-    {
-        return a.val > b.val;
-    }
 
 		void solve_sub_problem(
       std::vector<up_tuple> & vUp,
@@ -737,18 +739,17 @@ void Solver_MCSVM_WW::solve_sub_problem(
     std::vector<up_tuple> & vUp,
     std::vector<id_tuple> & vId,
     double * beta){
+
 #ifdef DIAGNOSTIC2
   std::cout<< "vUp.size(): " << vUp.size() << "\n";
   std::cout<< "vId.size(): " << vId.size() << "\n";
-  std::sort(vUp.begin(),vUp.end(), compareVal<up_tuple>);
-  std::sort(vId.begin(),vId.end(), compareVal<id_tuple>);
   std::cout << "Up down: \n";
   for(int i = 0; i < vUp.size(); i++){
     std::cout << "val: " << vUp[i].val << ", up: " << vUp[i].up << "\n";
   }
   std::cout << "Ind: \n";
   for(int i = 0; i < vId.size(); i++){
-    std::cout << "val: " << vId[i].val << ", up: " << vId[i].idx << "\n";
+    std::cout << "val: " << vId[i].val << ", id: " << vId[i].idx << "\n";
   }
 #endif
 
@@ -770,10 +771,11 @@ void Solver_MCSVM_WW::solve_sub_problem(
 
     double gamma = (C*num_up + sum_v_mi)/(num_mi+1.0);
 
-    num_dn = l-1 - num_up - num_mi;
+    num_dn = nr_class-1 - num_up - num_mi;
 
 #ifdef DIAGNOSTIC2
     std::cout<<"iter: " << i << "\n";
+    std::cout<<"gamma: " << gamma << "\n";
     std::cout<<"num_up: " << num_up << ", num_mi: " << num_mi << ", num_dn :" << num_dn << "\n";
     std::cout<<"upper_mid: " << vId[num_up].val << ", lower_mid: " << vId[num_up+num_mi-1].val;
     std::cout<<", upper_dn: " << vId[num_up+num_mi].val;
@@ -782,28 +784,32 @@ void Solver_MCSVM_WW::solve_sub_problem(
 
 
     bool kkt = 1;
+
     if(num_up > 0){
 #ifdef DIAGNOSTIC2
       std::cout <<"up_min: " <<vId[num_up-1].val <<", ";
 #endif
       kkt *= ((C+gamma) <= vId[num_up-1].val);
     }
+
     if(num_mi > 0){
       kkt *= (vId[num_up].val <= (C + gamma));
       kkt *= (gamma <= vId[num_up+num_mi-1].val);
 #ifdef DIAGNOSTIC2
-      std::cout <<"mi_max: " <<vId[num_up].val <<", ";
-      std::cout <<"mi_min: " <<vId[num_up+num_mi-1].val <<", ";
+      std::cout <<"mi_max: " <<vId[num_up].val <<" <= " << C+gamma <<", ";
+      std::cout <<"mi_min: " <<vId[num_up+num_mi-1].val <<" >= " << gamma << ", ";
 #endif
     }
+
     if(num_dn > 0 && num_up+num_mi < vId.size()){
 #ifdef DIAGNOSTIC2
       std::cout <<"dn_max: " <<vId[num_up+num_mi].val <<", ";
 #endif
       kkt *= (vId[num_up+num_mi].val <= gamma);
     }
+
 #ifdef DIAGNOSTIC2
-    std::cout <<"\n";
+    std::cout <<"\nkkt: " << kkt << "\n";
 #endif
    if(kkt){
       for(int j = 0; j < vId.size(); j++){
@@ -817,9 +823,11 @@ void Solver_MCSVM_WW::solve_sub_problem(
         }
         beta[vId[j].idx] = beta_val;
       }
-      break;
+      return;
     }
   }
+  printf("did not find kkt");
+  exit(0);
 }
 
 void Solver_MCSVM_WW::Solve(double *w){
@@ -875,7 +883,7 @@ void Solver_MCSVM_WW::Solve(double *w){
 		for(i=0;i<l;i++)
 		{
 			j = i+rand()%(l-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 
     // inner loop
@@ -947,6 +955,8 @@ void Solver_MCSVM_WW::Solve(double *w){
       /* } */
 
       if(vId.size()>0){
+        std::sort(vUp.begin(),vUp.end(), compareVal<up_tuple>);
+        std::sort(vId.begin(),vId.end(), compareVal<id_tuple>);
         solve_sub_problem(vUp,vId,alpha_new);
       }
 
@@ -1241,7 +1251,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 		for(i=0;i<l;i++)
 		{
 			j = i+rand()%(l-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 
     // inner loop
@@ -1441,7 +1451,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 		for(i=0;i<active_size;i++)
 		{
 			int j = i+rand()%(active_size-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 		for(s=0;s<active_size;s++)
 		{
@@ -1489,8 +1499,8 @@ void Solver_MCSVM_CS::Solve(double *w)
 							if(!be_shrunk(i, active_size_i[i], y_index[i],
 											alpha_i[alpha_index_i[active_size_i[i]]], minG))
 							{
-								swap(alpha_index_i[m], alpha_index_i[active_size_i[i]]);
-								swap(G[m], G[active_size_i[i]]);
+								my_swap(alpha_index_i[m], alpha_index_i[active_size_i[i]]);
+								my_swap(G[m], G[active_size_i[i]]);
 								if(y_index[i] == active_size_i[i])
 									y_index[i] = m;
 								else if(y_index[i] == m)
@@ -1505,7 +1515,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 				if(active_size_i[i] <= 1)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -1699,7 +1709,7 @@ static void solve_l2r_l1l2_svc(
 		for (i=0; i<active_size; i++)
 		{
 			int j = i+rand()%(active_size-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 
 		for (s=0; s<active_size; s++)
@@ -1719,7 +1729,7 @@ static void solve_l2r_l1l2_svc(
 				if (G > PGmax_old)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -1731,7 +1741,7 @@ static void solve_l2r_l1l2_svc(
 				if (G < PGmin_old)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -1890,7 +1900,7 @@ static void solve_l2r_l1l2_svr(
 		for(i=0; i<active_size; i++)
 		{
 			int j = i+rand()%(active_size-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 
 		for(s=0; s<active_size; s++)
@@ -1914,7 +1924,7 @@ static void solve_l2r_l1l2_svr(
 				else if(Gp>Gmax_old && Gn<-Gmax_old)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -1926,7 +1936,7 @@ static void solve_l2r_l1l2_svr(
 				else if(Gp < -Gmax_old)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -1938,7 +1948,7 @@ static void solve_l2r_l1l2_svr(
 				else if(Gn > Gmax_old)
 				{
 					active_size--;
-					swap(index[s], index[active_size]);
+					my_swap(index[s], index[active_size]);
 					s--;
 					continue;
 				}
@@ -2091,7 +2101,7 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 		for (i=0; i<l; i++)
 		{
 			int j = i+rand()%(l-i);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 		int newton_iter = 0;
 		double Gmax = 0;
@@ -2265,7 +2275,7 @@ static void solve_l1r_l2_svc(
 		for(j=0; j<active_size; j++)
 		{
 			int i = j+rand()%(active_size-j);
-			swap(index[i], index[j]);
+			my_swap(index[i], index[j]);
 		}
 
 		for(s=0; s<active_size; s++)
@@ -2310,7 +2320,7 @@ static void solve_l1r_l2_svc(
 					else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
 					{
 						active_size--;
-						swap(index[s], index[active_size]);
+						my_swap(index[s], index[active_size]);
 						s--;
 						continue;
 					}
@@ -2625,7 +2635,7 @@ static void solve_l1r_lr(
 					else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
 					{
 						active_size--;
-						swap(index[s], index[active_size]);
+						my_swap(index[s], index[active_size]);
 						s--;
 						continue;
 					}
@@ -2661,7 +2671,7 @@ static void solve_l1r_lr(
 			for(j=0; j<QP_active_size; j++)
 			{
 				int i = j+rand()%(QP_active_size-j);
-				swap(index[i], index[j]);
+				my_swap(index[i], index[j]);
 			}
 
 			for(s=0; s<QP_active_size; s++)
@@ -2699,7 +2709,7 @@ static void solve_l1r_lr(
 						else if(Gp>QP_Gmax_old/l && Gn<-QP_Gmax_old/l)
 						{
 							QP_active_size--;
-							swap(index[s], index[QP_active_size]);
+							my_swap(index[s], index[QP_active_size]);
 							s--;
 							continue;
 						}
@@ -2915,7 +2925,7 @@ struct heap {
 			int p = (i-1)/2;
 			if(cmp(a[p], a[i]))
 			{
-				swap(a[i], a[p]);
+				my_swap(a[i], a[p]);
 				i = p;
 			}
 			else
@@ -2935,7 +2945,7 @@ struct heap {
 				l = r;
 			if(cmp(a[i], a[l]))
 			{
-				swap(a[i], a[l]);
+				my_swap(a[i], a[l]);
 				i = l;
 			}
 			else
@@ -3041,7 +3051,7 @@ static void solve_oneclass_svm(const problem *prob, double *w, double *rho, doub
 			    (alpha[i] == 0 && -G[i] < negGmin))
 			{
 				active_size--;
-				swap(index[s], index[active_size]);
+				my_swap(index[s], index[active_size]);
 				s--;
 			}
 		}
@@ -3312,12 +3322,12 @@ static void group_classes(const problem *prob, int *nr_class_ret, int **label_re
 	//
 	// Labels are ordered by their first occurrence in the training set.
 	// However, for two-class sets with -1/+1 labels and -1 appears first,
-	// we swap labels to ensure that internally the binary SVM has positive data corresponding to the +1 instances.
+	// we my_swap labels to ensure that internally the binary SVM has positive data corresponding to the +1 instances.
 	//
 	if (nr_class == 2 && label[0] == -1 && label[1] == 1)
 	{
-		swap(label[0],label[1]);
-		swap(count[0],count[1]);
+		my_swap(label[0],label[1]);
+		my_swap(count[0],count[1]);
 		for(i=0;i<l;i++)
 		{
 			if(data_label[i] == 0)
@@ -3854,7 +3864,7 @@ void cross_validation(const problem *prob, const parameter *param, int nr_fold, 
 	for(i=0;i<l;i++)
 	{
 		int j = i+rand()%(l-i);
-		swap(perm[i],perm[j]);
+		my_swap(perm[i],perm[j]);
 	}
 	for(i=0;i<=nr_fold;i++)
 		fold_start[i]=i*l/nr_fold;
@@ -3917,7 +3927,7 @@ void find_parameters(const problem *prob, const parameter *param, int nr_fold, d
 	for(i=0;i<l;i++)
 	{
 		int j = i+rand()%(l-i);
-		swap(perm[i],perm[j]);
+		my_swap(perm[i],perm[j]);
 	}
 	for(i=0;i<=nr_fold;i++)
 		fold_start[i]=i*l/nr_fold;

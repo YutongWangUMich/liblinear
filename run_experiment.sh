@@ -3,13 +3,13 @@
 # DATASETNAME="dna.scale"
 # DATASETNAME="letter.scale"
 # DATASETNAME="pendigits"
-# DATASETNAME="news20.scale"
+DATASETNAME="news20.scale"
 # DATASETNAME="sector.scale"
-DATASETNAME="mnist.scale"
+# DATASETNAME="mnist.scale"
 # DATASETNAME="cifar10"
 # DATASETNAME="toy"
 
-REG=1
+REG=0.1
 # REG=0.000000004
 ITER=1
 FILENAME="results/${DATASETNAME}_RC"
