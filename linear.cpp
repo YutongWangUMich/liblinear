@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include "linear.h"
 #include "newton.h"
 int liblinear_version = LIBLINEAR_VERSION;
@@ -642,7 +643,28 @@ class Solver_MCSVM_WW
     ~Solver_MCSVM_WW();
     void Solve(double *w);
   private:
-		void solve_sub_problem(double * v, double * alpha_new);
+
+    struct id_tuple{
+      double val;
+      int idx;
+    };
+
+    struct up_tuple{
+      double val;
+      bool up;
+    };
+
+    template<class T>
+    bool compareVal(const T &a, const T &b)
+    {
+        return a.val > b.val;
+    }
+
+		void solve_sub_problem(
+      std::vector<up_tuple> & vUp,
+      std::vector<id_tuple> & vId,
+      double *beta);
+
 		double C;
 		int w_size, l; // l is the number of instances
 		int nr_class;
@@ -669,6 +691,8 @@ Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double C, do
 	this->prob = prob;
 	this->C = C;
 }
+
+
 
 struct ind_tuple{
   double val;
@@ -709,125 +733,93 @@ int * argsort(double *v, int length){
 }
 
 
-void Solver_MCSVM_WW::solve_sub_problem(double * v, double * alpha_new){
-
-  int i;
-  int l = nr_class;
-  int z1 = 0, z2 = 0, idx_C = -1, num_C = 0;
-  int tb;
-  int kkt1, kkt2;
-  int num_L1, num_L2;
-  double offset;
-  double * vals_unsrt = new double[2*(l-1)];
-  for(i=0;i<l-1;i++){
-    vals_unsrt[i] = v[i];
-    vals_unsrt[i+(l-1)] = v[i]-C;
+void Solver_MCSVM_WW::solve_sub_problem(
+    std::vector<up_tuple> & vUp,
+    std::vector<id_tuple> & vId,
+    double * beta){
+#ifdef DIAGNOSTIC2
+  std::cout<< "vUp.size(): " << vUp.size() << "\n";
+  std::cout<< "vId.size(): " << vId.size() << "\n";
+  std::sort(vUp.begin(),vUp.end(), compareVal<up_tuple>);
+  std::sort(vId.begin(),vId.end(), compareVal<id_tuple>);
+  std::cout << "Up down: \n";
+  for(int i = 0; i < vUp.size(); i++){
+    std::cout << "val: " << vUp[i].val << ", up: " << vUp[i].up << "\n";
   }
+  std::cout << "Ind: \n";
+  for(int i = 0; i < vId.size(); i++){
+    std::cout << "val: " << vId[i].val << ", up: " << vId[i].idx << "\n";
+  }
+#endif
 
-  int * vdx = argsort(v,l-1);
-  int * idx = argsort(vals_unsrt, 2*(l-1));
-
-  double sum_vL1 = 0;
-  double sum_vL2 = 0;
-  double sum_alpha1;
-  double sum_alpha2;
-
-  for(i=0;i<2*(l-1);i++){
-    if(idx[i] >= l-1){
-      tb = 1;
+  int num_up = 0;
+  int num_mi = 0;
+  double sum_v_mi = 0;
+  int num_dn;
+  for(int i = 0; i < vUp.size(); i++){
+    double val = vUp[i].val;
+    bool up = vUp[i].up;
+    if(up){
+      sum_v_mi -= vId[num_up].val;
+      num_up++;
+      num_mi--;
     }else{
-      tb = 0;
-    }
-    /* printf("tb: %d\n", tb); */
-
-    if(tb==1){
-      offset = v[idx[i]-l+1];
-    }else{
-      offset = v[idx[i]];
+      sum_v_mi += vId[num_up+num_mi].val;
+      num_mi++;
     }
 
-    while((z1 < l-1) && (v[vdx[z1]] - offset + tb*C > 0)){
-      sum_vL1 += v[vdx[z1]];
-      z1++;
-    }
+    double gamma = (C*num_up + sum_v_mi)/(num_mi+1.0);
 
-    while((z2 < l-1) && (v[vdx[z2]] - offset + tb*C >= 0)){
-      sum_vL2 += v[vdx[z2]];
-      z2++;
-    }
+    num_dn = l-1 - num_up - num_mi;
 
-    while((idx_C < l-2) && (v[vdx[idx_C+1]] - offset + tb*C >= C)){
-      idx_C++;
-      num_C++;
-      sum_vL1 -= v[vdx[idx_C]];
-      sum_vL2 -= v[vdx[idx_C]];
-    }
+#ifdef DIAGNOSTIC2
+    std::cout<<"iter: " << i << "\n";
+    std::cout<<"num_up: " << num_up << ", num_mi: " << num_mi << ", num_dn :" << num_dn << "\n";
+    std::cout<<"upper_mid: " << vId[num_up].val << ", lower_mid: " << vId[num_up+num_mi-1].val;
+    std::cout<<", upper_dn: " << vId[num_up+num_mi].val;
+    std::cout<<"\n";
+#endif
 
-    num_L1 = z1 - idx_C - 1;
-    num_L2 = z2 - idx_C - 1;
 
-    sum_alpha1 = sum_vL1 - num_L1*(sum_vL1+num_C*C)/(num_L1+1) + num_C*C;
-    sum_alpha2 = sum_vL2 - num_L2*(sum_vL2+num_C*C)/(num_L2+1) + num_C*C;
-
-    kkt1 = 1;
-    if(num_L1>0){
-        kkt1 *= C>=(v[vdx[idx_C+1]]- (sum_vL1+num_C*C)/(num_L1+1));
-        kkt1 *= (v[vdx[z1-1]]- (sum_vL1+num_C*C)/(num_L1+1))>=0;
+    bool kkt = 1;
+    if(num_up > 0){
+#ifdef DIAGNOSTIC2
+      std::cout <<"up_min: " <<vId[num_up-1].val <<", ";
+#endif
+      kkt *= ((C+gamma) <= vId[num_up-1].val);
     }
-    if(z1 < l-1){
-        kkt1 *= (sum_alpha1>= v[vdx[z1]]);
+    if(num_mi > 0){
+      kkt *= (vId[num_up].val <= (C + gamma));
+      kkt *= (gamma <= vId[num_up+num_mi-1].val);
+#ifdef DIAGNOSTIC2
+      std::cout <<"mi_max: " <<vId[num_up].val <<", ";
+      std::cout <<"mi_min: " <<vId[num_up+num_mi-1].val <<", ";
+#endif
     }
-    if(idx_C > 0){
-        kkt1 *= (C + sum_alpha1<= v[vdx[idx_C]]);
+    if(num_dn > 0 && num_up+num_mi < vId.size()){
+#ifdef DIAGNOSTIC2
+      std::cout <<"dn_max: " <<vId[num_up+num_mi].val <<", ";
+#endif
+      kkt *= (vId[num_up+num_mi].val <= gamma);
     }
-
-    kkt2 = 1;
-    if(num_L2>0){
-        kkt2 *= C>=(v[vdx[idx_C+1]]- (sum_vL2+num_C*C)/(num_L2+1));
-        kkt2 *= (v[vdx[z2-1]]- (sum_vL2+num_C*C)/(num_L2+1))>=0;
-    }
-    if(z2 < l-1){
-        kkt2 *= (sum_alpha2>= v[vdx[z2]]);
-    }
-    if(idx_C > 0){
-        kkt2 *= (C + sum_alpha2<= v[vdx[idx_C]]);
-    }
-
-    if(kkt1 == 1){
-      for(int j =0; j< l-1; j++){
-        if(j<= idx_C){
-          alpha_new[vdx[j]] = C;
-        }else if(j<z1){
-          alpha_new[vdx[j]] = v[vdx[j]] -  (sum_vL1+num_C*C)/(num_L1+1);
-
-          if(kkt1 == 1){
-          }
+#ifdef DIAGNOSTIC2
+    std::cout <<"\n";
+#endif
+   if(kkt){
+      for(int j = 0; j < vId.size(); j++){
+        double beta_val;
+        if(j < num_up){
+          beta_val = C;
+        }else if(j < num_up+num_mi){
+          beta_val = vId[j].val - gamma;
         }else{
-          alpha_new[vdx[j]] = 0;
+          beta_val = 0;
         }
+        beta[vId[j].idx] = beta_val;
       }
-      return;
-    }
-
-    if(kkt2 == 1){
-      for(int j =0; j< l-1; j++){
-        if(j<= idx_C){
-          alpha_new[vdx[j]] = C;
-        }else if(j<z2){
-          alpha_new[vdx[j]] = v[vdx[j]] -  (sum_vL2+num_C*C)/(num_L2+1);
-
-          if(kkt1 == 1){
-          }
-        }else{
-          alpha_new[vdx[j]] = 0;
-        }
-      }
-      return;
+      break;
     }
   }
-  printf("did not find KKT condition");
-  exit(1);
-  return;
 }
 
 void Solver_MCSVM_WW::Solve(double *w){
@@ -908,9 +900,10 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
 
       double nsxi = x_sq_norms[i];
-      // compute v
-      bool is_zero = true;
-      int num_negs = 0;
+
+      std::vector<up_tuple> vUp;
+      std::vector<id_tuple> vId;
+
       for(s=0;s<nr_class-1;s++){
         double rho;
         // compute rho_{yi} * w'xi
@@ -923,33 +916,45 @@ void Solver_MCSVM_WW::Solve(double *w){
             rho = wxi[s]-wxi[yi-1];
           }
         }
-        v[s] = (1/nsxi)*(1.0 - (rho - nsxi*(alpha[i*(nr_class-1)+s] + sum_alpha)));
-        if(v[s] > 0.0) is_zero = false;
-        else num_negs++;
-      }
-      /* printf("%d\n", num_negs); */
+        double val = (1/nsxi)*(1.0 - (rho - nsxi*(alpha[i*(nr_class-1)+s] + sum_alpha)));
+        v[s] = val;
 
-      if(iter > 2){
-      printf("=====iteration: %d\n", j);
-      printf("%f\nv: \t\t", nsxi);
-      print_array<double>(v,nr_class-1);
-      }
-
-      if(is_zero){
-        for(s = 0; s<nr_class-1;s++){
-          alpha_new[s] = 0.0;
+        if(val > 0){
+          id_tuple vIndElem;
+          vIndElem.val = val;
+          vIndElem.idx = s;
+          vId.push_back(vIndElem);
+          
+          up_tuple vDnElem;
+          vDnElem.val = val;
+          vDnElem.up = 0;
+          vUp.push_back(vDnElem);
+          if(val - C > 0){
+            up_tuple vUpElem;
+            vUpElem.val = val - C;
+            vUpElem.up = 1;
+            vUp.push_back(vUpElem);
+          }
+        }else{
+          alpha_new[s] = 0;
         }
       }
-      else
-      {
-        solve_sub_problem(v,alpha_new);
+
+      /* if(iter > 2){ */
+      /* printf("=====iteration: %d\n", j); */
+      /* printf("%f\nv: \t\t", nsxi); */
+      /* print_array<double>(v,nr_class-1); */
+      /* } */
+
+      if(vId.size()>0){
+        solve_sub_problem(vUp,vId,alpha_new);
       }
 
-      if(iter > 2){
-        printf("alpha_new: \t");
-        print_array<double>(alpha_new,nr_class-1);
-        if(j>10) exit(0);
-      }
+      /* if(iter > 2){ */
+      /*   printf("alpha_new: \t"); */
+      /*   print_array<double>(alpha_new,nr_class-1); */
+      /*   if(j>10) exit(0); */
+      /* } */
 
 
       sum_del_alpha = 0;

@@ -3,9 +3,9 @@
 # DATASETNAME="dna.scale"
 # DATASETNAME="letter.scale"
 # DATASETNAME="pendigits"
-DATASETNAME="news20.scale"
+# DATASETNAME="news20.scale"
 # DATASETNAME="sector.scale"
-# DATASETNAME="mnist.scale"
+DATASETNAME="mnist.scale"
 # DATASETNAME="cifar10"
 # DATASETNAME="toy"
 
