@@ -758,7 +758,7 @@ void Solver_MCSVM_WW::solve_sub_problem(
   double sum_v_mi = 0;
   int num_dn;
   for(int i = 0; i < vUp.size(); i++){
-    double val = vUp[i].val;
+    /* double val = vUp[i].val; */
     bool up = vUp[i].up;
     if(up){
       sum_v_mi -= vId[num_up].val;
@@ -844,6 +844,9 @@ void Solver_MCSVM_WW::Solve(double *w){
   double *wxi = new double[nr_class-1];
   double *v = new double[nr_class-1];
 
+  std::vector<up_tuple> vUp;
+  std::vector<id_tuple> vId;
+
   const feature_node *xi;
 
   // Compute the squared norms of all the samples
@@ -909,8 +912,6 @@ void Solver_MCSVM_WW::Solve(double *w){
 
       double nsxi = x_sq_norms[i];
 
-      std::vector<up_tuple> vUp;
-      std::vector<id_tuple> vId;
 
       for(s=0;s<nr_class-1;s++){
         double rho;
@@ -958,6 +959,8 @@ void Solver_MCSVM_WW::Solve(double *w){
         std::sort(vUp.begin(),vUp.end(), compareVal<up_tuple>);
         std::sort(vId.begin(),vId.end(), compareVal<id_tuple>);
         solve_sub_problem(vUp,vId,alpha_new);
+        vUp.clear();
+        vId.clear();
       }
 
       /* if(iter > 2){ */
