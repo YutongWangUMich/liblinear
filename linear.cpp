@@ -637,21 +637,90 @@ double calc_WW_primal_obj(
 // solution will be put in w
 //
 
-struct id_tuple{
-  double val;
-  int idx;
+template <class T>
+struct T_heap {
+	int _size;
+
+  struct _tuple{
+    double val;
+    T data;
+  };
+
+	_tuple * a;
+
+	T_heap(int max_size)
+	{
+		_size = 0;
+		a = new _tuple[max_size];
+	}
+	~T_heap()
+	{
+		delete [] a;
+	}
+
+	bool cmp(const _tuple & left, const _tuple & right)
+	{
+		return left.val < right.val;
+	}
+
+	int size()
+	{
+		return _size;
+	}
+	void push(double val, T data)
+	{
+		a[_size].val = val;
+    a[_size].data = data;
+		_size++;
+		int i = _size-1;
+		while(i)
+		{
+			int p = (i-1)/2;
+			if(cmp(a[p], a[i]))
+			{
+				std::swap(a[i], a[p]);
+				i = p;
+			}
+			else
+				break;
+		}
+	}
+	void pop()
+	{
+		_size--;
+		a[0] = a[_size];
+		int i = 0;
+		while(i*2+1 < _size)
+		{
+			int l = i*2+1;
+			int r = i*2+2;
+			if(r < _size && cmp(a[l], a[r]))
+				l = r;
+			if(cmp(a[i], a[l]))
+			{
+				std::swap(a[i], a[l]);
+				i = l;
+			}
+			else
+				break;
+		}
+	}
+	_tuple top()
+	{
+		return a[0];
+	}
+
+  void print_state(){
+    for(int i = 0; i < _size; i++){
+      std::cout << "(" << a[i].val << "," << a[i].data << "), ";
+    }
+    std::cout << std::endl;
+  }
 };
 
-struct up_tuple{
-  double val;
-  bool up;
-};
 
-template<class T>
-bool compareVal(const T &a, const T &b)
-{
-    return a.val > b.val;
-}
+
+
 
 class Solver_MCSVM_WW
 {
@@ -663,8 +732,10 @@ class Solver_MCSVM_WW
 
 
 		void solve_sub_problem(
-      std::vector<up_tuple> & vUp,
-      std::vector<id_tuple> & vId,
+      T_heap<bool> & UpDnHeap,
+      T_heap<int> & IdxHeap,
+      double * vSort,
+      int * vIdx,
       double *beta);
 
 		double C;
@@ -673,6 +744,9 @@ class Solver_MCSVM_WW
 		int max_iter;
 		double eps;
 		const problem *prob;
+
+    /* double * vSort; */
+    /* int * vIdx; */
 };
 
 
@@ -696,19 +770,6 @@ Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double C, do
 
 
 
-struct ind_tuple{
-  double val;
-  int idx;
-};
-
-int compare2(const void * a, const void * b)
-{
-  ind_tuple *A = (ind_tuple *)a;
-  ind_tuple *B = (ind_tuple *)b;
-  if( B->val < A->val) return -1;
-  if( B->val > A->val) return 1;
-  return 0;
-}
 
 template <class T>
 void print_array(T * v, int length){
@@ -720,53 +781,71 @@ void print_array(T * v, int length){
 }
 
 
-int * argsort(double *v, int length){
-  ind_tuple * vv = new ind_tuple[length];
-  for(int i = 0; i < length; i++){
-    vv[i].val = v[i];
-    vv[i].idx = i;
-  }
-  qsort(vv,length, sizeof(ind_tuple), compare2);
-  int * idx = new int[length];
-  for(int i =0; i < length; i++){
-    idx[i] = vv[i].idx;
-  }
-  return idx;
-}
 
 
 void Solver_MCSVM_WW::solve_sub_problem(
-    std::vector<up_tuple> & vUp,
-    std::vector<id_tuple> & vId,
+    T_heap<bool> & UpDnHeap,
+    T_heap<int> & IdxHeap,
+    double * vSort,
+    int * vIdx,
     double * beta){
+  // modifies the following state variables
+  //   double * vSort
+  //   int * vIdx
+  //
+  // assumes that beta has been properly initialized with zeros
 
-#ifdef DIAGNOSTIC2
-  std::cout<< "vUp.size(): " << vUp.size() << "\n";
-  std::cout<< "vId.size(): " << vId.size() << "\n";
-  std::cout << "Up down: \n";
-  for(int i = 0; i < vUp.size(); i++){
-    std::cout << "val: " << vUp[i].val << ", up: " << vUp[i].up << "\n";
-  }
-  std::cout << "Ind: \n";
-  for(int i = 0; i < vId.size(); i++){
-    std::cout << "val: " << vId[i].val << ", id: " << vId[i].idx << "\n";
-  }
-#endif
+  // EXPLANATION
+  // set * denote an arbitrary number strictly between 0 and C
+  //
+  //   num_up           num_mi          num_dn
+  //      |                |               |
+  //  /----------\   /-----------\   /----------\
+  //  |          |   |           |   |          |
+  // [C, C, ..., C,  *, *, ... , *,  0, 0, ..., 0]            Optimizer
+  // 
+  // [v1    .... v3  v4    ...   v6  v7    ...  v9]           vSort
+  //             ^   ^           ^   ^
+  //             |   |           |   |
+  //             X   Y           U   V
+  //
+  // X = vId[num_up-1].val
+  // Y = vId[num_up].val
+  // U = vId[num_up+num_mi-1].val
+  // V = vId[num_up+num_mi].val
 
-  int num_up = 0;
-  int num_mi = 0;
+  int num_up = 0, num_mi = 0, num_dn;
   double sum_v_mi = 0;
-  int num_dn;
-  for(int i = 0; i < vUp.size(); i++){
-    /* double val = vUp[i].val; */
-    bool up = vUp[i].up;
+  bool up;
+  double val;
+
+  int nvIdx = 0, nvSort = 0, nvPos = IdxHeap.size();
+  vSort[nvSort] = IdxHeap.top().val;
+  nvSort++;
+
+  while(UpDnHeap.size()>0){
+    up = UpDnHeap.top().data;
+    val = UpDnHeap.top().val;
+
+    UpDnHeap.pop();
     if(up){
-      sum_v_mi -= vId[num_up].val;
+      sum_v_mi -= (val+C);
       num_up++;
       num_mi--;
     }else{
-      sum_v_mi += vId[num_up+num_mi].val;
+      /* std::cout << "idx: " << IdxHeap.top().data << " at " << nvIdx << "\n"; */
+      vIdx[nvIdx] = IdxHeap.top().data;
+      IdxHeap.pop();
+
+      if(nvSort < nvPos){
+        vSort[nvSort] = IdxHeap.top().val;
+      }
+
+      sum_v_mi += val;
       num_mi++;
+
+      nvIdx++;
+      nvSort++;
     }
 
     double gamma = (C*num_up + sum_v_mi)/(num_mi+1.0);
@@ -774,54 +853,44 @@ void Solver_MCSVM_WW::solve_sub_problem(
     num_dn = nr_class-1 - num_up - num_mi;
 
 #ifdef DIAGNOSTIC2
-    std::cout<<"iter: " << i << "\n";
     std::cout<<"gamma: " << gamma << "\n";
     std::cout<<"num_up: " << num_up << ", num_mi: " << num_mi << ", num_dn :" << num_dn << "\n";
-    std::cout<<"upper_mid: " << vId[num_up].val << ", lower_mid: " << vId[num_up+num_mi-1].val;
-    std::cout<<", upper_dn: " << vId[num_up+num_mi].val;
+    /* std::cout<<"upper_mid: " << vId[num_up].val << ", lower_mid: " << vId[num_up+num_mi-1].val; */
+    /* std::cout<<", upper_dn: " << vId[num_up+num_mi].val; */
+    /* std::cout<<"\n"; */
+    std::cout<<"upper_mid: " << vSort[num_up] << ", lower_mid: " << vSort[num_up+num_mi-1];
+    std::cout<<", upper_dn: " << vSort[num_up+num_mi];
     std::cout<<"\n";
-#endif
+    std::cout <<"nvSort: " << nvSort << ", ";
+    std::cout <<"nvIdx: " << nvIdx;
+    std::cout<<"\n";
 
+#endif
 
     bool kkt = 1;
 
     if(num_up > 0){
-#ifdef DIAGNOSTIC2
-      std::cout <<"up_min: " <<vId[num_up-1].val <<", ";
-#endif
-      kkt *= ((C+gamma) <= vId[num_up-1].val);
+      kkt *= ((C+gamma) <= vSort[num_up-1]);
     }
 
     if(num_mi > 0){
-      kkt *= (vId[num_up].val <= (C + gamma));
-      kkt *= (gamma <= vId[num_up+num_mi-1].val);
-#ifdef DIAGNOSTIC2
-      std::cout <<"mi_max: " <<vId[num_up].val <<" <= " << C+gamma <<", ";
-      std::cout <<"mi_min: " <<vId[num_up+num_mi-1].val <<" >= " << gamma << ", ";
-#endif
+      kkt *= (vSort[num_up] <= (C + gamma));
+      kkt *= (gamma <= vSort[num_up+num_mi-1]);
     }
 
-    if(num_dn > 0 && num_up+num_mi < vId.size()){
-#ifdef DIAGNOSTIC2
-      std::cout <<"dn_max: " <<vId[num_up+num_mi].val <<", ";
-#endif
-      kkt *= (vId[num_up+num_mi].val <= gamma);
+    if(num_dn > 0 && num_up+num_mi < nvPos){
+      kkt *= (vSort[num_up+num_mi] <= gamma);
     }
 
-#ifdef DIAGNOSTIC2
-    std::cout <<"\nkkt: " << kkt << "\n";
-#endif
    if(kkt){
-      for(int j = 0; j < vId.size(); j++){
-        double beta_val;
+      double beta_val;
+      for(int j = 0; j < nvIdx; j++){
         if(j < num_up){
           beta_val = C;
-        }else if(j < num_up+num_mi){
-          beta_val = vId[j].val - gamma;
         }else{
-          beta_val = 0;
+          beta_val = vSort[j] - gamma;
         }
-        beta[vId[j].idx] = beta_val;
+        beta[vIdx[j]] = beta_val;
       }
       return;
     }
@@ -844,8 +913,12 @@ void Solver_MCSVM_WW::Solve(double *w){
   double *wxi = new double[nr_class-1];
   double *v = new double[nr_class-1];
 
-  std::vector<up_tuple> vUp;
-  std::vector<id_tuple> vId;
+
+  double * vSort = new double[nr_class-1];
+  int * vIdx = new int[nr_class-1];
+  T_heap<bool> UpDnHeap(2*(nr_class-1));
+  T_heap<int> IdxHeap(nr_class-1);
+
 
   const feature_node *xi;
 
@@ -929,44 +1002,44 @@ void Solver_MCSVM_WW::Solve(double *w){
         v[s] = val;
 
         if(val > 0){
-          id_tuple vIndElem;
-          vIndElem.val = val;
-          vIndElem.idx = s;
-          vId.push_back(vIndElem);
-          
-          up_tuple vDnElem;
-          vDnElem.val = val;
-          vDnElem.up = 0;
-          vUp.push_back(vDnElem);
+          IdxHeap.push(val, s);
+          UpDnHeap.push(val, 0);
           if(val - C > 0){
-            up_tuple vUpElem;
-            vUpElem.val = val - C;
-            vUpElem.up = 1;
-            vUp.push_back(vUpElem);
+            UpDnHeap.push(val - C, 1);
           }
-        }else{
-          alpha_new[s] = 0;
         }
+        /* else{ */
+        /*   alpha_new[s] = 0; */
+        /* } */
+          alpha_new[s] = 0;
       }
 
-      /* if(iter > 2){ */
-      /* printf("=====iteration: %d\n", j); */
-      /* printf("%f\nv: \t\t", nsxi); */
-      /* print_array<double>(v,nr_class-1); */
-      /* } */
 
-      if(vId.size()>0){
-        std::sort(vUp.begin(),vUp.end(), compareVal<up_tuple>);
-        std::sort(vId.begin(),vId.end(), compareVal<id_tuple>);
-        solve_sub_problem(vUp,vId,alpha_new);
-        vUp.clear();
-        vId.clear();
+#ifdef DIAGNOSTIC2
+      std::cout << "Iteration: " << j << std::endl;
+      std::cout << "nr_class: " << nr_class << std::endl;
+      std::cout << "v: " << std::endl;
+      print_array(v,nr_class-1);
+
+      std::cout << "UpDnHeap: " << std::endl;
+      UpDnHeap.print_state();
+      std::cout << "IdxHeap: " << std::endl;
+      IdxHeap.print_state();
+#endif
+
+
+      if(IdxHeap.size()>0){
+        solve_sub_problem(UpDnHeap, IdxHeap, vSort, vIdx, alpha_new);
+        UpDnHeap._size = 0;
+        IdxHeap._size = 0;
       }
 
-      /* if(iter > 2){ */
-      /*   printf("alpha_new: \t"); */
-      /*   print_array<double>(alpha_new,nr_class-1); */
-      /*   if(j>10) exit(0); */
+#ifdef DIAGNOSTIC2
+      std::cout << "alpha_new: " << std::endl;
+      print_array(alpha_new, nr_class-1);
+#endif
+      /* if(iter>0 && j>100){ */
+      /*   exit(0); */
       /* } */
 
 

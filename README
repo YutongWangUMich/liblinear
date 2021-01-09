@@ -14,6 +14,9 @@
 ./predict data/mnist.scale.t mnist.scale.model output
 
 
+./train -s 30 -c 1 -t 10 data/rcv1
+
+
 - USPS
 
 ./train -s 30 -c 1 -t 16 data/usps
