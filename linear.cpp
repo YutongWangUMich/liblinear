@@ -1009,11 +1009,35 @@ void Solver_MCSVM_WW::Solve(double *w){
           }
         }
         double val = (1/nsxi)*(1.0 - (rho - nsxi*(alpha[i*(nr_class-1)+s] + sum_alpha)));
+        if(val > 0){
+          v_val_new[v_size_new] = val;
+          v_idx_new[v_size_new] = s;
+          v_size_new++;
+        }
+      }
         /* v[s] = val; */
+      bool changed = false;
+      if(v_size_new != v_size_old[i]){
+        changed = true;
+      }else{
+        for(s = 0; s < v_size_new; s++){
+          changed = fabs(v_val_new[s] - v_val_old[i*(nr_class-1)+s]) > 1e-12 ||
+            v_idx_new[s] != v_idx_old[i*(nr_class-1)+s];
+        }
+      }
 
+      if(!changed) continue;
+
+      v_size_old[i] = v_size_new;
+
+      for(s = 0; s < v_size_new; s++){
+        double val = v_val_new[s];
+        idx = v_idx_new[s];
+        v_val_old[i*(nr_class-1)+s] = val;
+        v_idx_old[i*(nr_class-1)+s] = idx;
 
         if(val > 0){
-          IdxHeap.push(val, s);
+          IdxHeap.push(val, idx);
           UpDnHeap.push(val, 0);
           if(val - C > 0){
             UpDnHeap.push(val - C, 1);
