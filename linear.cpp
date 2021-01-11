@@ -900,18 +900,26 @@ void Solver_MCSVM_WW::solve_sub_problem(
 }
 
 void Solver_MCSVM_WW::Solve(double *w){
-  int i, s,j;
+  int i,s,j;
   int iter = 0;
   int idx;
 	double *alpha =  new double[l*(nr_class-1)];
+
+  double *v_val_old =  new double[l*(nr_class-1)];
+  int *v_idx_old =  new int[l*(nr_class-1)];
+  int *v_size_old = new int[l];
+
+  double *v_val_new = new double[nr_class-1];
+  int *v_idx_new = new int[nr_class-1];
+  int v_size_new;
+  
 	double *alpha_new = new double[nr_class-1];
-  double *alpha_old = new double[nr_class-1];
+  /* double *alpha_old = new double[nr_class-1]; */
   double *del_alpha = new double[nr_class-1];
   double sum_del_alpha;
 
   double *x_sq_norms = new double[l];
   double *wxi = new double[nr_class-1];
-  double *v = new double[nr_class-1];
 
 
   double * vSort = new double[nr_class-1];
@@ -967,9 +975,10 @@ void Solver_MCSVM_WW::Solve(double *w){
       i = index[j];
       int yi = (int)prob->y[i];
 
-      // reset the wxi, populate the old alpha
+      // reset variables wxi and alpha_new
       for(s=0;s<nr_class-1;s++){
         wxi[s] = 0;
+        alpha_new[s] = 0;
       }
       // compute the k-1 dimension vector w'xi
       for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
@@ -986,6 +995,7 @@ void Solver_MCSVM_WW::Solve(double *w){
       double nsxi = x_sq_norms[i];
 
 
+      v_size_new = 0;
       for(s=0;s<nr_class-1;s++){
         double rho;
         // compute rho_{yi} * w'xi
@@ -999,7 +1009,8 @@ void Solver_MCSVM_WW::Solve(double *w){
           }
         }
         double val = (1/nsxi)*(1.0 - (rho - nsxi*(alpha[i*(nr_class-1)+s] + sum_alpha)));
-        v[s] = val;
+        /* v[s] = val; */
+
 
         if(val > 0){
           IdxHeap.push(val, s);
@@ -1011,7 +1022,6 @@ void Solver_MCSVM_WW::Solve(double *w){
         /* else{ */
         /*   alpha_new[s] = 0; */
         /* } */
-          alpha_new[s] = 0;
       }
 
 
@@ -1053,13 +1063,13 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
       /* print_array<double>(del_alpha,nr_class-1); */
       double sum_dd=0;
-      bool do_update = false;
+      /* bool do_update = false; */
       for(s=0;s<nr_class-1;s++){
         sum_dd += del_alpha[s];
-        if(del_alpha[s] != 0){ do_update = true;}
+        /* if(del_alpha[s] != 0){ do_update = true;} */
       }
       
-      if(do_update){
+      /* if(do_update){ */
         for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
           for(s=0;s<nr_class-1;s++){
             w[(idx-1)*nr_class+s+1] += xi->value*(del_alpha[s]+sum_dd);
@@ -1068,7 +1078,7 @@ void Solver_MCSVM_WW::Solve(double *w){
         for(s=0;s<nr_class-1;s++){
           alpha[i*(nr_class-1)+s] = alpha_new[s];
         }
-      }
+      /* } */
 
     }
     iter++;
@@ -1139,7 +1149,7 @@ class Solver_MCSVM_WW_Shark
     void Solve(double *w);
   private:
     double calcGradient(double * gradient, double * wxi, double * alpha, double C, unsigned int yi);
-    void updateWeightVectors(double * w, double * mu, size_t index);
+    void updateWeightVectors(double * w, double * mu, size_t index, double * step);
 		void solveSub(double epsilon, double * gradient, double q, double C, unsigned int y, double * alpha, double * mu);
 
 		double C;
@@ -1178,11 +1188,11 @@ double Solver_MCSVM_WW_Shark::calcGradient(double * gradient, double * wx, doubl
     }
     else
     {
-#ifdef SHARKF_FIX 
-      const double g = 1.0 -  (wx[y] - wx[c]);
-#else
+/* #ifdef SHARK_FIX */
+/*       const double g = 1.0 -  (wx[y] - wx[c]); */
+/* #else */
       const double g = 1.0 -  0.5 * (wx[y] - wx[c]);
-#endif
+/* #endif */
       gradient[c] = g;
       if (g > violation && alpha[c] < C) violation = g;
       else if (-g > violation && alpha[c] > 0.0)  violation = -g;
@@ -1191,15 +1201,19 @@ double Solver_MCSVM_WW_Shark::calcGradient(double * gradient, double * wx, doubl
   return violation;
 }
 
-void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t index){
+void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t index, double * step){
   double sum_mu = 0.0;
   for(size_t c = 0; c < nr_class; c++) sum_mu += mu[c];
   int y_i = (int)prob->y[index];
 
-  double * step = new double[nr_class];
   for(size_t s = 0; s<nr_class; s++){
+/* #ifdef SHARK_FIX */
+/*       if(s == y_i){ step[s] = sum_mu; } */
+/*       else{ step[s] = -mu[s]; } */
+/* #else */
       if(s == y_i){ step[s] = 0.5*sum_mu; }
       else{ step[s] = -0.5*mu[s]; }
+/* #endif */
   }
 
   // The following chunk is equivalent to the "add_scale" function from Shark's implementation
@@ -1217,10 +1231,14 @@ void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t 
 // This function modifies: gradient, alpha and mu
 void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q, double C, unsigned int y, double * alpha, double * mu){
 
-#ifndef SHARK_FIX
+  // q = squared norm of x_i
+/* #ifndef SHARK_FIX */
+/*   const double qq = 2.0 * q; // 2 times squared norm of x_i */
+/* #else */
   const double qq = 0.5 * q; // one-half times squared norm of x_i
-#endif
+/* #endif */
   
+  /* for(size_t iter = 0; iter < ; iter++){ */
   for(size_t iter = 0; iter < 10 * nr_class; iter++){
     size_t idx = 0;
     double kkt = 0.0;
@@ -1237,14 +1255,14 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
     if (kkt < epsilon) break;
 
     const double a = alpha[idx];
-    const double g = gradient[idx];
+    const double g = gradient[idx]; // negative gradient actually
 
 
-#ifdef SHARK_FIX
-    double m = 0.5 * g / q;
-#else
-    double m = g / qq;
-#endif
+/* #ifdef SHARK_FIX */
+/*     double m = g/qq; */
+/* #else */
+    double m = g/qq;
+/* #endif */
 
     double a_new = a + m;
     if (a_new <= 0.0)
@@ -1264,11 +1282,11 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
     mu[idx] += m;
 
     // update gradient
-#ifdef SHARK_FIX
-    const double dg = m * q;
-#else
+/* #ifdef SHARK_FIX */
+/*     const double dg = m * q; */
+/* #else */
     const double dg = 0.5 * m * qq;
-#endif
+/* #endif */
     for(size_t c = 0; c < nr_class; c++) gradient[c] -= dg;
     gradient[idx] -= dg;
   }
@@ -1286,6 +1304,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   double kkt;
   double epsilon = 0.1 * MAX_KKT_VIOLATION;
 
+  double * step = new double[nr_class];
   double *x_sq_norms = new double[l];
   double *wx = new double[nr_class];
 
@@ -1357,7 +1376,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
       double q = x_sq_norms[i];
       if(kkt > 0.0){
         solveSub(epsilon, g, q, C, y_i, a, mu);
-        updateWeightVectors(w, mu, i);
+        updateWeightVectors(w, mu, i, step);
       }
 
     }
@@ -3844,7 +3863,7 @@ model* train(const problem *prob, const parameter *param)
 			for(i=0;i<nr_class;i++)
 				for(j=start[i];j<start[i]+count[i];j++)
 					sub_prob.y[j] = i;
-			Solver_MCSVM_WW_Shark Solver(&sub_prob, nr_class, param->C, param->eps, param->max_iter);
+			Solver_MCSVM_WW_Shark Solver(&sub_prob, nr_class, 4*param->C, param->eps, param->max_iter);
 #ifdef TRACE
       std::clock_t    start_time;
       start_time = std::clock();
@@ -3852,6 +3871,8 @@ model* train(const problem *prob, const parameter *param)
 			Solver.Solve(model_->w);
 #ifdef TRACE
       std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
+
+      for(i=0;i<nr_class*n;i++) model_->w[i] *= (0.5);
       double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C);
       std::cout << "Primal objective = " << primal_obj << ", ";
 #endif
