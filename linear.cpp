@@ -644,8 +644,9 @@ double calc_WW_primal_obj(
 // solution will be put in w
 //
 
+
 template <class T>
-struct T_heap {
+struct T_array {
 	int _size;
 
   struct _tuple{
@@ -655,66 +656,45 @@ struct T_heap {
 
 	_tuple * a;
 
-	T_heap(int max_size)
+	T_array(int max_size)
 	{
 		_size = 0;
 		a = new _tuple[max_size];
 	}
-	~T_heap()
+	~T_array()
 	{
 		delete [] a;
 	}
 
-	bool cmp(const _tuple & left, const _tuple & right)
-	{
-		return left.val < right.val;
-	}
+	
+  struct {
+      bool operator()(const _tuple & left, const _tuple right) const { return left.val < right.val; }
+  } cmp;
 
 	int size()
 	{
 		return _size;
 	}
+
+  void sort_by_vals()
+  {
+    std::sort(a, a+_size, cmp);
+  }
 	void push(double val, T data)
 	{
 		a[_size].val = val;
     a[_size].data = data;
 		_size++;
-		int i = _size-1;
-		while(i)
-		{
-			int p = (i-1)/2;
-			if(cmp(a[p], a[i]))
-			{
-				my_swap(a[i], a[p]);
-				i = p;
-			}
-			else
-				break;
-		}
 	}
+
 	void pop()
 	{
 		_size--;
-		a[0] = a[_size];
-		int i = 0;
-		while(i*2+1 < _size)
-		{
-			int l = i*2+1;
-			int r = i*2+2;
-			if(r < _size && cmp(a[l], a[r]))
-				l = r;
-			if(cmp(a[i], a[l]))
-			{
-				my_swap(a[i], a[l]);
-				i = l;
-			}
-			else
-				break;
-		}
 	}
+
 	_tuple top()
 	{
-		return a[0];
+		return a[_size-1];
 	}
 
 #ifdef DIAGNOSTIC2
@@ -725,8 +705,6 @@ struct T_heap {
     std::cout << std::endl;
   }
 #endif
-
-
 };
 
 
@@ -745,8 +723,8 @@ class Solver_MCSVM_WW
     /* double epsilon = 0.1 * MAX_KKT_VIOLATION; */
     double epsilon = 0;
 		double solve_sub_problem(
-      T_heap<bool> & UpDnHeap,
-      T_heap<int> & IdxHeap,
+      T_array<bool> & UpDnHeap,
+      T_array<int> & IdxHeap,
       double * vSort,
       int * vIdx,
       double *beta);
@@ -797,8 +775,8 @@ void print_array(T * v, int length){
 
 
 double Solver_MCSVM_WW::solve_sub_problem(
-    T_heap<bool> & UpDnHeap,
-    T_heap<int> & IdxHeap,
+    T_array<bool> & UpDnHeap,
+    T_array<int> & IdxHeap,
     double * vSort,
     int * vIdx,
     double * beta){
@@ -933,8 +911,8 @@ void Solver_MCSVM_WW::Solve(double *w){
   double * vSort = new double[nr_class-1];
   int * vIdx = new int[nr_class-1];
 
-  T_heap<bool> UpDnHeap(2*(nr_class-1));
-  T_heap<int> IdxHeap(nr_class-1);
+  T_array<bool> UpDnHeap(2*(nr_class-1));
+  T_array<int> IdxHeap(nr_class-1);
 
 
   double * v_pos = new double[nr_class-1];
@@ -1059,6 +1037,8 @@ void Solver_MCSVM_WW::Solve(double *w){
           UpDnHeap.push(val - C, 1);
         }
       }
+      UpDnHeap.sort_by_vals();
+      IdxHeap.sort_by_vals();
 
 
 
