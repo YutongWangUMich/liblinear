@@ -4,14 +4,15 @@
 # DATASETNAME="letter.scale"
 # DATASETNAME="pendigits"
 # DATASETNAME="news20.scale"
-# DATASETNAME="sector.scale"
+DATASETNAME="sector.scale"
 # DATASETNAME="mnist.scale"
 # DATASETNAME="cifar10"
 # DATASETNAME="toy"
 # DATASETNAME="rcv1"
-DATASETNAME="aloi.scale"
+# DATASETNAME="aloi.scale"
 
-REG=.01
+REG=1
+# REG=.01
 # REG=0.000000004
 ITER=1
 FILENAME="results/${DATASETNAME}_RC"

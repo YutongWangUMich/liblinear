@@ -16,6 +16,10 @@
 
 ./train -s 30 -c 1 -t 10 data/rcv1
 
+./train -s 30 -c .01 -t 8 data/aloi.scale
+
+./train -s 30 -c 1 -t 16 data/sector.scale
+
 
 - USPS
 

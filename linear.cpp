@@ -24,6 +24,13 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 	memcpy((void *)dst,(void *)src,sizeof(T)*n);
 }
 
+
+
+// This value is used to define epsilon in the Solver function
+// See Shark/Test/Algorithms/Trainers/LinearSvmTrainer.cpp
+// of the Shark-ML package.
+#define MAX_KKT_VIOLATION 1e-5
+
 #define TRACE
 /* #define SHARK_FIX */
 /* #define DIAGNOSTIC2 */
@@ -678,7 +685,7 @@ struct T_heap {
 			int p = (i-1)/2;
 			if(cmp(a[p], a[i]))
 			{
-				std::swap(a[i], a[p]);
+				my_swap(a[i], a[p]);
 				i = p;
 			}
 			else
@@ -698,7 +705,7 @@ struct T_heap {
 				l = r;
 			if(cmp(a[i], a[l]))
 			{
-				std::swap(a[i], a[l]);
+				my_swap(a[i], a[l]);
 				i = l;
 			}
 			else
@@ -710,12 +717,16 @@ struct T_heap {
 		return a[0];
 	}
 
+#ifdef DIAGNOSTIC2
   void print_state(){
     for(int i = 0; i < _size; i++){
       std::cout << "(" << a[i].val << "," << a[i].data << "), ";
     }
     std::cout << std::endl;
   }
+#endif
+
+
 };
 
 
@@ -731,7 +742,9 @@ class Solver_MCSVM_WW
   private:
 
 
-		void solve_sub_problem(
+    /* double epsilon = 0.1 * MAX_KKT_VIOLATION; */
+    double epsilon = 0;
+		double solve_sub_problem(
       T_heap<bool> & UpDnHeap,
       T_heap<int> & IdxHeap,
       double * vSort,
@@ -770,7 +783,7 @@ Solver_MCSVM_WW::Solver_MCSVM_WW(const problem *prob, int nr_class, double C, do
 
 
 
-
+#ifdef DIAGNOSTIC2
 template <class T>
 void print_array(T * v, int length){
   printf("[");
@@ -779,16 +792,17 @@ void print_array(T * v, int length){
   }
   printf("%f]\n", v[length-1]);
 }
+#endif
 
 
 
-
-void Solver_MCSVM_WW::solve_sub_problem(
+double Solver_MCSVM_WW::solve_sub_problem(
     T_heap<bool> & UpDnHeap,
     T_heap<int> & IdxHeap,
     double * vSort,
     int * vIdx,
     double * beta){
+
   // modifies the following state variables
   //   double * vSort
   //   int * vIdx
@@ -850,7 +864,7 @@ void Solver_MCSVM_WW::solve_sub_problem(
 
     double gamma = (C*num_up + sum_v_mi)/(num_mi+1.0);
 
-    num_dn = nr_class-1 - num_up - num_mi;
+    num_dn = nr_class - 1 - num_up - num_mi;
 
 #ifdef DIAGNOSTIC2
     std::cout<<"gamma: " << gamma << "\n";
@@ -864,7 +878,6 @@ void Solver_MCSVM_WW::solve_sub_problem(
     std::cout <<"nvSort: " << nvSort << ", ";
     std::cout <<"nvIdx: " << nvIdx;
     std::cout<<"\n";
-
 #endif
 
     bool kkt = 1;
@@ -881,6 +894,7 @@ void Solver_MCSVM_WW::solve_sub_problem(
     if(num_dn > 0 && num_up+num_mi < nvPos){
       kkt *= (vSort[num_up+num_mi] <= gamma);
     }
+    /* double beta_sum = C*num_up + sum_v_mi - gamma * num_mi; */
 
    if(kkt){
       double beta_val;
@@ -889,10 +903,12 @@ void Solver_MCSVM_WW::solve_sub_problem(
           beta_val = C;
         }else{
           beta_val = vSort[j] - gamma;
+          /* beta_sum += beta_val; */
         }
         beta[vIdx[j]] = beta_val;
       }
-      return;
+      /* std::cout << num_up+num_mi << std::endl; */
+      return C*num_up + sum_v_mi - gamma * num_mi;
     }
   }
   printf("did not find kkt");
@@ -901,22 +917,14 @@ void Solver_MCSVM_WW::solve_sub_problem(
 
 void Solver_MCSVM_WW::Solve(double *w){
   int i,s,j;
-  int iter = 0;
   int idx;
 	double *alpha =  new double[l*(nr_class-1)];
+  double *alpha_block_sums = new double[l];
 
-  double *v_val_old =  new double[l*(nr_class-1)];
-  int *v_idx_old =  new int[l*(nr_class-1)];
-  int *v_size_old = new int[l];
-
-  double *v_val_new = new double[nr_class-1];
-  int *v_idx_new = new int[nr_class-1];
-  int v_size_new;
   
 	double *alpha_new = new double[nr_class-1];
   /* double *alpha_old = new double[nr_class-1]; */
-  double *del_alpha = new double[nr_class-1];
-  double sum_del_alpha;
+  double *del_alpha_rho = new double[nr_class-1];
 
   double *x_sq_norms = new double[l];
   double *wxi = new double[nr_class-1];
@@ -924,8 +932,14 @@ void Solver_MCSVM_WW::Solve(double *w){
 
   double * vSort = new double[nr_class-1];
   int * vIdx = new int[nr_class-1];
+
   T_heap<bool> UpDnHeap(2*(nr_class-1));
   T_heap<int> IdxHeap(nr_class-1);
+
+
+  double * v_pos = new double[nr_class-1];
+  int * v_pos_idx = new int[nr_class-1];
+  int nv_pos;
 
 
   const feature_node *xi;
@@ -946,6 +960,7 @@ void Solver_MCSVM_WW::Solve(double *w){
 	for(i=0;i<l;i++)
 	{
 		index[i] = i;
+    alpha_block_sums[i] = 0;
 	}
 
 
@@ -961,6 +976,7 @@ void Solver_MCSVM_WW::Solve(double *w){
 		w[i] = 0;
 
   // outer loop
+  int iter = 0;
   while(iter<max_iter){
 
     // shuffle indices
@@ -987,66 +1003,63 @@ void Solver_MCSVM_WW::Solve(double *w){
         }
       }
 
-      double sum_alpha = 0.0;
-      for(s = 0;s<nr_class-1;s++){
-        sum_alpha += alpha[i*(nr_class-1)+s];
-      }
+      double * alpha_old = alpha + i*(nr_class-1);
+      double sum_alpha = alpha_block_sums[i];
 
       double nsxi = x_sq_norms[i];
 
+      /* bool kkt = true; */
+      nv_pos = 0;
 
-      v_size_new = 0;
       for(s=0;s<nr_class-1;s++){
-        double rho;
-        // compute rho_{yi} * w'xi
+        double rho_wxi;
+        // compute rho_wxi_{yi} * w'xi
         if(yi==0){
-          rho = wxi[s];
+          rho_wxi = wxi[s];
         }else{
           if(yi-1==s){
-            rho = -wxi[yi-1];
+            rho_wxi = -wxi[yi-1];
           }else{
-            rho = wxi[s]-wxi[yi-1];
+            rho_wxi = wxi[s]-wxi[yi-1];
           }
         }
-        double val = (1/nsxi)*(1.0 - (rho - nsxi*(alpha[i*(nr_class-1)+s] + sum_alpha)));
-        if(val > 0){
-          v_val_new[v_size_new] = val;
-          v_idx_new[v_size_new] = s;
-          v_size_new++;
-        }
-      }
-        /* v[s] = val; */
-      bool changed = false;
-      if(v_size_new != v_size_old[i]){
-        changed = true;
-      }else{
-        for(s = 0; s < v_size_new; s++){
-          changed = fabs(v_val_new[s] - v_val_old[i*(nr_class-1)+s]) > 1e-12 ||
-            v_idx_new[s] != v_idx_old[i*(nr_class-1)+s];
-        }
-      }
+        /* double alpha_old_s = alpha_old[s]; */
+        double val = (1 - rho_wxi)/nsxi + alpha_old[s] + sum_alpha;
 
-      if(!changed) continue;
-
-      v_size_old[i] = v_size_new;
-
-      for(s = 0; s < v_size_new; s++){
-        double val = v_val_new[s];
-        idx = v_idx_new[s];
-        v_val_old[i*(nr_class-1)+s] = val;
-        v_idx_old[i*(nr_class-1)+s] = idx;
-
-        if(val > 0){
-          IdxHeap.push(val, idx);
-          UpDnHeap.push(val, 0);
-          if(val - C > 0){
-            UpDnHeap.push(val - C, 1);
-          }
-        }
-        /* else{ */
-        /*   alpha_new[s] = 0; */
+        /* if(kkt){ // if kkt gets turned false, it will not go back */
+        /*   if(alpha_old_s > 0){ */
+        /*     kkt *= (alpha_old_s + sum_alpha <= val + epsilon); */
+        /*   } */
+        /*   if(alpha_old_s < C){ */
+        /*     kkt *= (alpha_old_s + sum_alpha >= val - epsilon); */
+        /*   } */
         /* } */
+
+        if(val > 0){
+          v_pos[nv_pos] = val;
+          v_pos_idx[nv_pos] = s;
+          nv_pos++;
+        }
       }
+      /* if(kkt){ */
+      /*   /1* std::cout << 1 << std::endl; *1/ */
+      /*   continue; */
+      /* }else{ */
+      /*   /1* std::cout << 0 << std::endl; *1/ */
+      /* } */
+
+      UpDnHeap._size = 0;
+      IdxHeap._size = 0;
+      for(s = 0; s < nv_pos; s++){
+        double val = v_pos[s];
+        idx = v_pos_idx[s];
+        IdxHeap.push(val, idx);
+        UpDnHeap.push(val, 0);
+        if(val - C > 0){
+          UpDnHeap.push(val - C, 1);
+        }
+      }
+
 
 
 #ifdef DIAGNOSTIC2
@@ -1061,48 +1074,38 @@ void Solver_MCSVM_WW::Solve(double *w){
       IdxHeap.print_state();
 #endif
 
+      /* std::cout << IdxHeap.size() << std::endl; */
 
       if(IdxHeap.size()>0){
-        solve_sub_problem(UpDnHeap, IdxHeap, vSort, vIdx, alpha_new);
-        UpDnHeap._size = 0;
-        IdxHeap._size = 0;
+        alpha_block_sums[i] = solve_sub_problem(UpDnHeap, IdxHeap, vSort, vIdx, alpha_new);
+      }else{
+        alpha_block_sums[i] = 0;
       }
 
 #ifdef DIAGNOSTIC2
       std::cout << "alpha_new: " << std::endl;
       print_array(alpha_new, nr_class-1);
 #endif
-      /* if(iter>0 && j>100){ */
-      /*   exit(0); */
-      /* } */
 
-
-      sum_del_alpha = 0;
+      double sum_del_alpha_rho = 0;
       for(s=0;s<nr_class-1;s++){
-        del_alpha[s] = alpha_new[s]-alpha[i*(nr_class-1)+s];
-        sum_del_alpha += del_alpha[s];
+        del_alpha_rho[s] = alpha_new[s] - alpha_old[s];
+        alpha_old[s] = alpha_new[s];
+        sum_del_alpha_rho += del_alpha_rho[s];
       }
+      double del_alpha_rho_O;
       if(yi>0){
-        del_alpha[yi-1] = -sum_del_alpha;
+        del_alpha_rho_O = -del_alpha_rho[yi-1];
+        del_alpha_rho[yi-1] = -sum_del_alpha_rho;
+      }else{
+        del_alpha_rho_O = sum_del_alpha_rho;
       }
-      /* print_array<double>(del_alpha,nr_class-1); */
-      double sum_dd=0;
-      /* bool do_update = false; */
-      for(s=0;s<nr_class-1;s++){
-        sum_dd += del_alpha[s];
-        /* if(del_alpha[s] != 0){ do_update = true;} */
-      }
-      
-      /* if(do_update){ */
-        for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
-          for(s=0;s<nr_class-1;s++){
-            w[(idx-1)*nr_class+s+1] += xi->value*(del_alpha[s]+sum_dd);
-          }
-        }
+
+      for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
         for(s=0;s<nr_class-1;s++){
-          alpha[i*(nr_class-1)+s] = alpha_new[s];
+          w[(idx-1)*nr_class+s+1] += (xi->value)*(del_alpha_rho[s]+del_alpha_rho_O);
         }
-      /* } */
+      }
 
     }
     iter++;
@@ -1123,12 +1126,6 @@ void Solver_MCSVM_WW::Solve(double *w){
       w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
     }
   }
-
-  /* for(idx = 0; idx < w_size; idx++){ */
-  /*   for(s=0;s<nr_class-1;s++){ */
-  /*     w[idx*nr_class+s+1] *= -1; */
-  /*   } */
-  /* } */
 }
 
 
@@ -1137,10 +1134,6 @@ void Solver_MCSVM_WW::Solve(double *w){
 
 
 
-// This value is used to define epsilon in the Solver function
-// See Shark/Test/Algorithms/Trainers/LinearSvmTrainer.cpp
-// of the Shark-ML package.
-#define MAX_KKT_VIOLATION 1e-5
 
 // A reimplmentation of the Shark library's
 // coordinate descent algorithm for
@@ -1225,25 +1218,20 @@ double Solver_MCSVM_WW_Shark::calcGradient(double * gradient, double * wx, doubl
   return violation;
 }
 
-void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t index, double * step){
+void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t i, double * step){
   double sum_mu = 0.0;
   for(size_t c = 0; c < nr_class; c++) sum_mu += mu[c];
-  int y_i = (int)prob->y[index];
+  int y_i = (int)prob->y[i];
 
   for(size_t s = 0; s<nr_class; s++){
-/* #ifdef SHARK_FIX */
-/*       if(s == y_i){ step[s] = sum_mu; } */
-/*       else{ step[s] = -mu[s]; } */
-/* #else */
       if(s == y_i){ step[s] = 0.5*sum_mu; }
       else{ step[s] = -0.5*mu[s]; }
-/* #endif */
   }
 
   // The following chunk is equivalent to the "add_scale" function from Shark's implementation
   const feature_node *xi;
   int fidx; // feature index
-  for(xi = prob->x[index]; (fidx=xi->index)!=-1;xi++){
+  for(xi = prob->x[i]; (fidx=xi->index)!=-1;xi++){
     for(size_t s=0; s<nr_class; s++){
       w[(fidx-1)*nr_class+s] += step[s]*xi->value;
     }
@@ -1255,14 +1243,8 @@ void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t 
 // This function modifies: gradient, alpha and mu
 void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q, double C, unsigned int y, double * alpha, double * mu){
 
-  // q = squared norm of x_i
-/* #ifndef SHARK_FIX */
-/*   const double qq = 2.0 * q; // 2 times squared norm of x_i */
-/* #else */
   const double qq = 0.5 * q; // one-half times squared norm of x_i
-/* #endif */
   
-  /* for(size_t iter = 0; iter < ; iter++){ */
   for(size_t iter = 0; iter < 10 * nr_class; iter++){
     size_t idx = 0;
     double kkt = 0.0;
@@ -1282,11 +1264,7 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
     const double g = gradient[idx]; // negative gradient actually
 
 
-/* #ifdef SHARK_FIX */
-/*     double m = g/qq; */
-/* #else */
     double m = g/qq;
-/* #endif */
 
     double a_new = a + m;
     if (a_new <= 0.0)
@@ -1300,17 +1278,12 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
       a_new = C;
     }
 
-    // at this point, a_new = a + m
 
     alpha[idx] = a_new;
     mu[idx] += m;
 
-    // update gradient
-/* #ifdef SHARK_FIX */
-/*     const double dg = m * q; */
-/* #else */
     const double dg = 0.5 * m * qq;
-/* #endif */
+
     for(size_t c = 0; c < nr_class; c++) gradient[c] -= dg;
     gradient[idx] -= dg;
   }
@@ -1396,7 +1369,6 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
       kkt = calcGradient(g, wx, a, C, y_i);
 
-      /* print_array<double>(g,nr_class); */
       double q = x_sq_norms[i];
       if(kkt > 0.0){
         solveSub(epsilon, g, q, C, y_i, a, mu);
@@ -1406,9 +1378,6 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
     }
     iter++;
   }
-  
-
-  /* print_array<double>(w,w_size*nr_class); */
 }
 
 
