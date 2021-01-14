@@ -1,17 +1,17 @@
-# DATASETNAME="usps"
+DATASETNAME="usps"
 # DATASETNAME="satimage.scale"
 # DATASETNAME="dna.scale"
 # DATASETNAME="letter.scale"
 # DATASETNAME="pendigits"
 # DATASETNAME="news20.scale"
-DATASETNAME="sector.scale"
+# DATASETNAME="sector.scale"
 # DATASETNAME="mnist.scale"
 # DATASETNAME="cifar10"
 # DATASETNAME="toy"
 # DATASETNAME="rcv1"
 # DATASETNAME="aloi.scale"
 
-REG=1
+REG=.01
 # REG=.01
 # REG=0.000000004
 ITER=1

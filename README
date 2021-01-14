@@ -25,7 +25,7 @@
 
 ./train -s 30 -c 1 -t 16 data/usps
 ./predict data/usps.t usps.model output
-./train -s 31 -c 1000 -t 1000 data/usps
+./train -s 31 -c 1 -t 16 data/usps
 ./predict data/usps.t usps.model output
 
 

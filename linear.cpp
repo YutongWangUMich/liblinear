@@ -31,7 +31,39 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 // of the Shark-ML package.
 #define MAX_KKT_VIOLATION 1e-5
 
-#define TRACE
+/* #define TRACE */
+#ifdef TRACE
+      std::clock_t    start_time;
+#endif
+
+
+#define TRAJ
+#ifdef TRAJ
+struct stopwatch{
+  std::clock_t    start_time;
+  std::clock_t    paused_time;
+  bool paused;
+  stopwatch(){
+    start_time = std::clock();
+    paused = false;
+  }
+
+  void pause(){
+    paused_time = std::clock();
+    paused = true;
+  }
+  void resume(){
+    if(paused){
+      // advance the start time
+      start_time += std::clock()-paused_time;
+    }
+  }
+
+  double get_time(){
+    return (std::clock() - start_time)/ (double)(CLOCKS_PER_SEC / 1000);
+  }
+};
+#endif
 /* #define SHARK_FIX */
 /* #define DIAGNOSTIC2 */
 
@@ -619,7 +651,7 @@ double calc_WW_primal_obj(
       }
     }
   }
-  printf("norm: %f, hinge risk: %f, ", norm_w, WW_hinge_risk);
+  printf("norm: %f, hinge risk: %f, ", norm_w/2, C*WW_hinge_risk);
   return (norm_w/2) + C*WW_hinge_risk;
 }
 
@@ -739,6 +771,8 @@ class Solver_MCSVM_WW
 		Solver_MCSVM_WW(const problem *prob, int nr_class, double C, double eps=0.1, int max_iter=5);
     ~Solver_MCSVM_WW();
     void Solve(double *w);
+    void marginalize(double *w);
+    void demarginalize(double *w);
   private:
 
 
@@ -915,7 +949,43 @@ double Solver_MCSVM_WW::solve_sub_problem(
   exit(0);
 }
 
+void Solver_MCSVM_WW::marginalize(double * w){
+  int idx,s;
+  for(idx = 0; idx < w_size; idx++){
+    for(s=0;s<nr_class-1;s++){
+      w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
+    }
+  }
+  for(idx = 0; idx < w_size; idx++){
+    w[idx*nr_class] = 0;
+  }
+}
+void Solver_MCSVM_WW::demarginalize(double * w){
+  // First column of W
+  int idx,s;
+  for(idx = 0; idx < w_size; idx++){
+    for(s=0;s<nr_class-1;s++){
+      w[idx*nr_class] += w[idx*nr_class+s+1];
+    }
+    w[idx*nr_class] /= nr_class;
+  }
+
+  for(idx = 0; idx < w_size; idx++){
+    for(s=0;s<nr_class-1;s++){
+      w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
+    }
+  }
+}
+
 void Solver_MCSVM_WW::Solve(double *w){
+#ifdef TRACE
+      start_time = std::clock();
+#endif
+
+#ifdef TRAJ
+  stopwatch SW;
+#endif
+
   int i,s,j;
   int idx;
 	double *alpha =  new double[l*(nr_class-1)];
@@ -990,6 +1060,7 @@ void Solver_MCSVM_WW::Solve(double *w){
     for(j=0;j<l;j++){
       i = index[j];
       int yi = (int)prob->y[i];
+      
 
       // reset variables wxi and alpha_new
       for(s=0;s<nr_class-1;s++){
@@ -1109,23 +1180,37 @@ void Solver_MCSVM_WW::Solve(double *w){
 
     }
     iter++;
+
+#ifdef TRAJ
+    SW.pause();
+    std::cout << "Time = " << SW.get_time() << " ms, ";
+    demarginalize(w);
+    double sum_alpha = 0;
+    for(i=0;i<l;i++){
+      sum_alpha += alpha_block_sums[i];
+    }
+    std::cout << "sum of dual = " << sum_alpha <<", ";
+
+    double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
+    std::cout << "Primal objective = " << primal_obj << "\n";
+    marginalize(w);
+    SW.resume();
+#endif
   }
 
   // Post-processing
+  demarginalize(w);
 
-  // First column of W
-  for(idx = 0; idx < w_size; idx++){
-    for(s=0;s<nr_class-1;s++){
-      w[idx*nr_class] += w[idx*nr_class+s+1];
-    }
-    w[idx*nr_class] /= nr_class;
-  }
 
-  for(idx = 0; idx < w_size; idx++){
-    for(s=0;s<nr_class-1;s++){
-      w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
-    }
+#ifdef TRACE
+  std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
+
+  double sum_alpha = 0;
+	for(i=0;i<l;i++){
+    sum_alpha += alpha_block_sums[i];
   }
+  std::cout << "sum of dual = " << sum_alpha <<", ";
+#endif
 }
 
 
@@ -1291,6 +1376,13 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
 }
 
 void Solver_MCSVM_WW_Shark::Solve(double *w){
+#ifdef TRACE
+      start_time = std::clock();
+#endif
+
+#ifdef TRAJ
+  stopwatch SW;
+#endif
   int i,s,j;
   int iter = 0;
   int idx;
@@ -1377,7 +1469,43 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
     }
     iter++;
+#ifdef TRAJ
+    SW.pause();
+    std::cout << "Time = " << SW.get_time() << " ms, ";
+
+  double sum_alpha = 0;
+	for(i=0;i<l;i++){
+    for(s = 0; s < nr_class; s++){
+      int y_i = (int)prob->y[i];
+      if(s == y_i) continue;
+      sum_alpha += alpha[i*nr_class+s];
+    }
   }
+  std::cout << "sum of dual = " << sum_alpha/4 <<", ";
+
+  for(i=0;i<nr_class*w_size;i++) w[i] *= (0.5);
+  double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C/4);
+  std::cout << "Primal objective = " << primal_obj << "\n";
+  for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
+  SW.resume();
+#endif
+  }
+
+
+
+#ifdef TRACE
+      std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
+      
+  double sum_alpha = 0;
+	for(i=0;i<l;i++){
+    for(s = 0; s < nr_class; s++){
+      int y_i = (int)prob->y[i];
+      if(s == y_i) continue;
+      sum_alpha += alpha[i*nr_class+s];
+    }
+  }
+  std::cout << "sum of dual = " << sum_alpha/4 <<", ";
+#endif
 }
 
 
@@ -3837,14 +3965,10 @@ model* train(const problem *prob, const parameter *param)
       Solver_MCSVM_WW Solver(&sub_prob, nr_class, param->C, param->eps, param->max_iter);
 
 
-#ifdef TRACE
-      std::clock_t    start_time;
-      start_time = std::clock();
-#endif
 			Solver.Solve(model_->w);
 
 #ifdef TRACE
-      std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
+      /* double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C); */
       double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C);
       std::cout << "Primal objective = " << primal_obj << ", ";
 #endif
@@ -3857,14 +3981,10 @@ model* train(const problem *prob, const parameter *param)
 				for(j=start[i];j<start[i]+count[i];j++)
 					sub_prob.y[j] = i;
 			Solver_MCSVM_WW_Shark Solver(&sub_prob, nr_class, 4*param->C, param->eps, param->max_iter);
-#ifdef TRACE
-      std::clock_t    start_time;
-      start_time = std::clock();
-#endif
-			Solver.Solve(model_->w);
-#ifdef TRACE
-      std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
 
+			Solver.Solve(model_->w);
+
+#ifdef TRACE
       for(i=0;i<nr_class*n;i++) model_->w[i] *= (0.5);
       double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C);
       std::cout << "Primal objective = " << primal_obj << ", ";
