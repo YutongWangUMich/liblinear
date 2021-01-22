@@ -31,14 +31,11 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 // of the Shark-ML package.
 #define MAX_KKT_VIOLATION 1e-5
 
-/* #define TRACE */
-#ifdef TRACE
-      std::clock_t    start_time;
-#endif
 
 
-#define TRAJ
-#ifdef TRAJ
+#define TRACE_OPTIM_TRAJ
+
+#ifdef TRACE_OPTIM_TRAJ
 struct stopwatch{
   std::clock_t    start_time;
   std::clock_t    paused_time;
@@ -64,7 +61,8 @@ struct stopwatch{
   }
 };
 #endif
-/* #define SHARK_FIX */
+
+
 /* #define DIAGNOSTIC2 */
 
 
@@ -785,6 +783,7 @@ class Solver_MCSVM_WW
       int * vIdx,
       double *beta);
 
+
 		double C;
 		int w_size, l; // l is the number of instances
 		int nr_class;
@@ -978,11 +977,8 @@ void Solver_MCSVM_WW::demarginalize(double * w){
 }
 
 void Solver_MCSVM_WW::Solve(double *w){
-#ifdef TRACE
-      start_time = std::clock();
-#endif
 
-#ifdef TRAJ
+#ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
 #endif
 
@@ -1181,7 +1177,7 @@ void Solver_MCSVM_WW::Solve(double *w){
     }
     iter++;
 
-#ifdef TRAJ
+#ifdef TRACE_OPTIM_TRAJ
     SW.pause();
     std::cout << "Time = " << SW.get_time() << " ms, ";
     demarginalize(w);
@@ -1202,16 +1198,13 @@ void Solver_MCSVM_WW::Solve(double *w){
   demarginalize(w);
 
 
-#ifdef TRACE
-  std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
-
-  double sum_alpha = 0;
-	for(i=0;i<l;i++){
-    sum_alpha += alpha_block_sums[i];
-  }
-  std::cout << "sum of dual = " << sum_alpha <<", ";
-#endif
 }
+
+
+
+
+
+
 
 
 
@@ -1376,11 +1369,8 @@ void Solver_MCSVM_WW_Shark::solveSub(double epsilon, double * gradient, double q
 }
 
 void Solver_MCSVM_WW_Shark::Solve(double *w){
-#ifdef TRACE
-      start_time = std::clock();
-#endif
 
-#ifdef TRAJ
+#ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
 #endif
   int i,s,j;
@@ -1469,7 +1459,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
     }
     iter++;
-#ifdef TRAJ
+#ifdef TRACE_OPTIM_TRAJ
     SW.pause();
     std::cout << "Time = " << SW.get_time() << " ms, ";
 
@@ -1490,22 +1480,6 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   SW.resume();
 #endif
   }
-
-
-
-#ifdef TRACE
-      std::cout << "Time = " << (std::clock() - start_time) / (double)(CLOCKS_PER_SEC / 1000) << " ms, ";
-      
-  double sum_alpha = 0;
-	for(i=0;i<l;i++){
-    for(s = 0; s < nr_class; s++){
-      int y_i = (int)prob->y[i];
-      if(s == y_i) continue;
-      sum_alpha += alpha[i*nr_class+s];
-    }
-  }
-  std::cout << "sum of dual = " << sum_alpha/4 <<", ";
-#endif
 }
 
 
@@ -3967,12 +3941,12 @@ model* train(const problem *prob, const parameter *param)
 
 			Solver.Solve(model_->w);
 
-#ifdef TRACE
-      /* double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C); */
-      double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C);
-      std::cout << "Primal objective = " << primal_obj << ", ";
-#endif
 
+    }
+    else if(param->solver_type == MCSVM_WW_Sparse)
+    {
+      std::cout<<"not supported yet";
+      exit(0);
     }
     else if(param->solver_type == MCSVM_WW_Shark)
     {
@@ -3984,11 +3958,6 @@ model* train(const problem *prob, const parameter *param)
 
 			Solver.Solve(model_->w);
 
-#ifdef TRACE
-      for(i=0;i<nr_class*n;i++) model_->w[i] *= (0.5);
-      double primal_obj = calc_WW_primal_obj(&sub_prob, nr_class, model_->w, param->C);
-      std::cout << "Primal objective = " << primal_obj << ", ";
-#endif
     }
 		else
 		{
@@ -4329,7 +4298,7 @@ static const char *solver_type_table[]=
 	"", "", "", "", "", "", "",
 	"ONECLASS_SVM", 
   "","","","","","","","",
-  "MCSVM_WW", "MCSVM_WW_Shark", NULL
+  "MCSVM_WW", "MCSVM_WW_Shark", "MCSVM_WW_Sparse", NULL
 };
 
 int save_model(const char *model_file_name, const struct model *model_)
@@ -4676,6 +4645,7 @@ const char *check_parameter(const problem *prob, const parameter *param)
 		&& param->solver_type != MCSVM_CS
     && param->solver_type != MCSVM_WW
     && param->solver_type != MCSVM_WW_Shark
+    && param->solver_type != MCSVM_WW_Sparse
 		&& param->solver_type != L1R_L2LOSS_SVC
 		&& param->solver_type != L1R_LR
 		&& param->solver_type != L2R_LR_DUAL
