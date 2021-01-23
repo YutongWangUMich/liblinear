@@ -769,8 +769,6 @@ class Solver_MCSVM_WW
 		Solver_MCSVM_WW(const problem *prob, int nr_class, double C, double eps=0.1, int max_iter=5);
     ~Solver_MCSVM_WW();
     void Solve(double *w);
-    void marginalize(double *w);
-    void demarginalize(double *w);
   private:
 
 
@@ -948,33 +946,6 @@ double Solver_MCSVM_WW::solve_sub_problem(
   exit(0);
 }
 
-void Solver_MCSVM_WW::marginalize(double * w){
-  int idx,s;
-  for(idx = 0; idx < w_size; idx++){
-    for(s=0;s<nr_class-1;s++){
-      w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
-    }
-  }
-  for(idx = 0; idx < w_size; idx++){
-    w[idx*nr_class] = 0;
-  }
-}
-void Solver_MCSVM_WW::demarginalize(double * w){
-  // First column of W
-  int idx,s;
-  for(idx = 0; idx < w_size; idx++){
-    for(s=0;s<nr_class-1;s++){
-      w[idx*nr_class] += w[idx*nr_class+s+1];
-    }
-    w[idx*nr_class] /= nr_class;
-  }
-
-  for(idx = 0; idx < w_size; idx++){
-    for(s=0;s<nr_class-1;s++){
-      w[idx*nr_class+s+1] = w[idx*nr_class] - w[idx*nr_class+s+1];
-    }
-  }
-}
 
 void Solver_MCSVM_WW::Solve(double *w){
 
@@ -1076,26 +1047,13 @@ void Solver_MCSVM_WW::Solve(double *w){
 
       double nsxi = x_sq_norms[i];
 
-      /* bool kkt = true; */
-      nv_pos = 0;
-
       if(yi > 0){
         my_swap(wxi[0],wxi[yi]);
       }
 
+      nv_pos = 0;
       for(s=0;s<nr_class-1;s++){
-        // compute rho_wxi_{yi} * w'xi
-        /* double alpha_old_s = alpha_old[s]; */
         double val = (1 - (wxi[0]-wxi[s+1]))/nsxi + alpha_old[s] + sum_alpha;
-
-        /* if(kkt){ // if kkt gets turned false, it will not go back */
-        /*   if(alpha_old_s > 0){ */
-        /*     kkt *= (alpha_old_s + sum_alpha <= val + epsilon); */
-        /*   } */
-        /*   if(alpha_old_s < C){ */
-        /*     kkt *= (alpha_old_s + sum_alpha >= val - epsilon); */
-        /*   } */
-        /* } */
 
         if(val > 0){
           v_pos[nv_pos] = val;
@@ -1103,12 +1061,6 @@ void Solver_MCSVM_WW::Solve(double *w){
           nv_pos++;
         }
       }
-      /* if(kkt){ */
-      /*   /1* std::cout << 1 << std::endl; *1/ */
-      /*   continue; */
-      /* }else{ */
-      /*   /1* std::cout << 0 << std::endl; *1/ */
-      /* } */
 
       UpDnHeap._size = 0;
       IdxHeap._size = 0;
