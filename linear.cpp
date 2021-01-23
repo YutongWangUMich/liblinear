@@ -1101,7 +1101,7 @@ void Solver_MCSVM_WW::Solve(double *w){
       print_array(alpha_new, nr_class-1);
 #endif
 
-      del_alpha_pi[0];
+      del_alpha_pi[0] = 0;
       for(s=0;s<nr_class-1;s++){
         del_alpha_pi[s+1] = -(alpha_new[s]-alpha_old[s]);
         alpha_old[s] = alpha_new[s];
