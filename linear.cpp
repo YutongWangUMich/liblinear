@@ -989,11 +989,10 @@ void Solver_MCSVM_WW::Solve(double *w){
 
   
 	double *alpha_new = new double[nr_class-1];
-  /* double *alpha_old = new double[nr_class-1]; */
-  double *del_alpha_rho = new double[nr_class-1];
+  double *del_alpha_pi = new double[nr_class];
 
   double *x_sq_norms = new double[l];
-  double *wxi = new double[nr_class-1];
+  double *wxi = new double[nr_class];
 
 
   double * vSort = new double[nr_class-1];
@@ -1063,10 +1062,12 @@ void Solver_MCSVM_WW::Solve(double *w){
         wxi[s] = 0;
         alpha_new[s] = 0;
       }
+      wxi[nr_class-1] = 0;
+
       // compute the k-1 dimension vector w'xi
       for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
-        for(s=0;s<nr_class-1;s++){
-          wxi[s] += w[(idx-1)*nr_class+s+1]*xi->value;
+        for(s=0;s<nr_class;s++){
+          wxi[s] += w[(idx-1)*nr_class+s]*xi->value;
         }
       }
 
@@ -1078,20 +1079,14 @@ void Solver_MCSVM_WW::Solve(double *w){
       /* bool kkt = true; */
       nv_pos = 0;
 
+      if(yi > 0){
+        my_swap(wxi[0],wxi[yi]);
+      }
+
       for(s=0;s<nr_class-1;s++){
-        double rho_wxi;
         // compute rho_wxi_{yi} * w'xi
-        if(yi==0){
-          rho_wxi = wxi[s];
-        }else{
-          if(yi-1==s){
-            rho_wxi = -wxi[yi-1];
-          }else{
-            rho_wxi = wxi[s]-wxi[yi-1];
-          }
-        }
         /* double alpha_old_s = alpha_old[s]; */
-        double val = (1 - rho_wxi)/nsxi + alpha_old[s] + sum_alpha;
+        double val = (1 - (wxi[0]-wxi[s+1]))/nsxi + alpha_old[s] + sum_alpha;
 
         /* if(kkt){ // if kkt gets turned false, it will not go back */
         /*   if(alpha_old_s > 0){ */
@@ -1154,23 +1149,21 @@ void Solver_MCSVM_WW::Solve(double *w){
       print_array(alpha_new, nr_class-1);
 #endif
 
-      double sum_del_alpha_rho = 0;
+      del_alpha_pi[0];
       for(s=0;s<nr_class-1;s++){
-        del_alpha_rho[s] = alpha_new[s] - alpha_old[s];
+        del_alpha_pi[s+1] = -(alpha_new[s]-alpha_old[s]);
         alpha_old[s] = alpha_new[s];
-        sum_del_alpha_rho += del_alpha_rho[s];
-      }
-      double del_alpha_rho_O;
-      if(yi>0){
-        del_alpha_rho_O = -del_alpha_rho[yi-1];
-        del_alpha_rho[yi-1] = -sum_del_alpha_rho;
-      }else{
-        del_alpha_rho_O = sum_del_alpha_rho;
+        del_alpha_pi[0] += -del_alpha_pi[s+1];
       }
 
-      for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
-        for(s=0;s<nr_class-1;s++){
-          w[(idx-1)*nr_class+s+1] += (xi->value)*(del_alpha_rho[s]+del_alpha_rho_O);
+      if(yi > 0){
+        my_swap(del_alpha_pi[0],del_alpha_pi[yi]);
+      }
+
+      for(s=0;s<nr_class;s++){
+        if(del_alpha_pi[s]==0) continue;
+        for(xi = prob->x[i]; (idx=xi->index)!=-1;xi++){
+          w[(idx-1)*nr_class+s] += (xi->value)*del_alpha_pi[s];
         }
       }
 
@@ -1180,7 +1173,6 @@ void Solver_MCSVM_WW::Solve(double *w){
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
     std::cout << "Time = " << SW.get_time() << " ms, ";
-    demarginalize(w);
     double sum_alpha = 0;
     for(i=0;i<l;i++){
       sum_alpha += alpha_block_sums[i];
@@ -1189,13 +1181,10 @@ void Solver_MCSVM_WW::Solve(double *w){
 
     double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
     std::cout << "Primal objective = " << primal_obj << "\n";
-    marginalize(w);
     SW.resume();
 #endif
   }
 
-  // Post-processing
-  demarginalize(w);
 
 
 }
@@ -1309,8 +1298,9 @@ void Solver_MCSVM_WW_Shark::updateWeightVectors(double * w, double * mu, size_t 
   // The following chunk is equivalent to the "add_scale" function from Shark's implementation
   const feature_node *xi;
   int fidx; // feature index
-  for(xi = prob->x[i]; (fidx=xi->index)!=-1;xi++){
-    for(size_t s=0; s<nr_class; s++){
+  for(size_t s=0; s<nr_class; s++){
+    if(step[s]==0) continue;
+    for(xi = prob->x[i]; (fidx=xi->index)!=-1;xi++){
       w[(fidx-1)*nr_class+s] += step[s]*xi->value;
     }
   }
