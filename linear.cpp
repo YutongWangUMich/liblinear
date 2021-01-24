@@ -1120,8 +1120,8 @@ void Solver_MCSVM_WW::Solve(double *w){
     }
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
-    /* std::cout << "Time = " << SW.get_time() << " ms, "; */
-    std::cout << SW.get_time() << ",";
+    double elapsed_time = SW.get_time();
+    std::cout << elapsed_time << ",";
     double sum_alpha = 0;
     for(i=0;i<l;i++){
       sum_alpha += alpha_block_sums[i];
@@ -1134,6 +1134,7 @@ void Solver_MCSVM_WW::Solve(double *w){
     if(iter == 0) dual_gap_init = primal_obj- dual_obj;
     std::cout << primal_obj << "\n";
     if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
+    if(elapsed_time/1000 > 3600) break;
     SW.resume();
 #endif
 
@@ -1422,7 +1423,8 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
     }
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
-    std::cout << SW.get_time() << ",";
+    double elapsed_time = SW.get_time();
+    std::cout << elapsed_time << ",";
 
   double sum_alpha = 0;
 	for(i=0;i<l;i++){
@@ -1444,6 +1446,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   if(iter == 0) dual_gap_init = primal_obj - dual_obj;
   std::cout << primal_obj << "\n";
   if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
+  if((elapsed_time/1000) > 3600) break;
 
   SW.resume();
 
