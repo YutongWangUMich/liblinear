@@ -48,9 +48,9 @@ nr_classes = {'usps':10,\
 regs = {'usps':.1,\
         'satimage.scale':1,\
         'dna.scale':1,\
-        'letter.scale':.1,\
+        'letter.scale':1,\
         'pendigits':.01,\
-        'news20.scale':.1,\
+        'news20.scale':1,\
         'sector.scale':1,\
         'mnist.scale':1,\
         'cifar10':1,\
@@ -61,25 +61,25 @@ regs = {'usps':.1,\
 
 
 iters = {'usps':2048,\
-         'satimage.scale':64,\
+         'satimage.scale':1024,\
          'dna.scale':1024,\
-         'letter.scale':64,\
+         'letter.scale':1024,\
          'pendigits':8192,\
-         'news20.scale':32,\
-         'sector.scale':32,\
-         'mnist.scale':64,\
-         'cifar10':32,\
-         'toy':32,\
-         'rcv1':32,\
-         'aloi.scale':32\
+         'news20.scale':1024,\
+         'sector.scale':1024,\
+         'mnist.scale':1024,\
+         'cifar10':1024,\
+         'toy':1024,\
+         'rcv1':1024,\
+         'aloi.scale':1024\
        }
 
 
 
 
-# run_these_datasets = [2,1,7,5,3,10,6,11]
-run_these_datasets = [2,1,7,5,3]
-run_these_hyperparams = [10,1,0.1,0.01]
+run_these_datasets = [2,1,7,5,3,10,6,11]
+# run_these_datasets = [2,1,7,5,3]
+run_these_hyperparams = [100,10,1,0.1,0.01]
 
 
 
