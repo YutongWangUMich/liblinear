@@ -33,7 +33,7 @@ dataset_names = {0:'usps',\
 nr_classes = {'usps':10,\
               'satimage.scale':6,\
               'dna.scale':3,\
-              'letter.scale':.26,\
+              'letter.scale':26,\
               'pendigits':10,\
               'news20.scale':20,\
               'sector.scale':105,\
@@ -52,11 +52,11 @@ regs = {'usps':.1,\
         'pendigits':.01,\
         'news20.scale':.1,\
         'sector.scale':1,\
-        'mnist.scale':.01,\
+        'mnist.scale':1,\
         'cifar10':1,\
         'toy':1,\
         'rcv1':1,\
-        'aloi.scale':.01\
+        'aloi.scale':1\
        }
 
 
@@ -77,7 +77,7 @@ iters = {'usps':2048,\
 
 
 
-run_these_datasets = [2,1,7,5]
+run_these_datasets = [2,1,7,5,3,10,6,11]
 run_these_hyperparams = [10,1,0.1,0.01]
 
 
@@ -108,7 +108,7 @@ def get_exp_name(ds, reg):
 
 
 for C in run_these_hyperparams:
-    print(get_exp_name(dataset_names[0], 1*C))
+    print(get_exp_name(dataset_names[0], C))
 
     
     
