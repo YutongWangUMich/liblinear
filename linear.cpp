@@ -601,7 +601,7 @@ void l2r_l2_svr_fun::grad(double *w, double *g)
 
 
 // Calculate the primal objective 
-double calc_WW_primal_obj(
+std::pair<double,double> calc_WW_primal_obj(
     const problem *prob,
 		int nr_class,
     double * w,
@@ -650,7 +650,8 @@ double calc_WW_primal_obj(
     }
   }
   printf("%f,%f,", norm_w/2, C*WW_hinge_risk);
-  return (norm_w/2) + C*WW_hinge_risk;
+  return std::pair<double,double>(norm_w/2, C*WW_hinge_risk);
+  /* return (norm_w/2) + C*WW_hinge_risk; */
 }
 
 
@@ -951,6 +952,7 @@ void Solver_MCSVM_WW::Solve(double *w){
 
 #ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
+  double dual_obj_init;
 #endif
 
   int i,s,j;
@@ -1126,8 +1128,12 @@ void Solver_MCSVM_WW::Solve(double *w){
     }
     std::cout << sum_alpha <<",";
 
-    double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
+    std::pair<double,double> optim_vals = calc_WW_primal_obj(prob, nr_class, w, C);
+    double primal_obj = optim_vals.first + optim_vals.second;
+    double dual_obj = sum_alpha - optim_vals.first;
+    if(iter == 0) dual_obj_init = dual_obj;
     std::cout << primal_obj << "\n";
+    if(dual_obj < 0.001*dual_obj_init) break;
     SW.resume();
 #endif
 
@@ -1325,6 +1331,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
 #ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
+  double dual_obj_init;
 #endif
   int i,s,j;
   int iter = 0;
@@ -1428,10 +1435,21 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   std::cout << sum_alpha/4 <<",";
 
   for(i=0;i<nr_class*w_size;i++) w[i] *= (0.5);
-  double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C/4);
-  std::cout << primal_obj << "\n";
+  std::pair<double,double> optim_vals = calc_WW_primal_obj(prob, nr_class, w, C/4);
+  double primal_obj = optim_vals.first + optim_vals.second;
+  double dual_obj = sum_alpha/4 - optim_vals.first;
   for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
+
+
+  if(iter == 0) dual_obj_init = dual_obj;
+  std::cout << primal_obj << "\n";
+  if(dual_obj < 0.001*dual_obj_init) break;
+
   SW.resume();
+
+
+
+
 #endif
 
     iter++;
