@@ -952,7 +952,7 @@ void Solver_MCSVM_WW::Solve(double *w){
 
 #ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
-  double dual_obj_init;
+  double dual_gap_init;
 #endif
 
   int i,s,j;
@@ -1131,9 +1131,9 @@ void Solver_MCSVM_WW::Solve(double *w){
     std::pair<double,double> optim_vals = calc_WW_primal_obj(prob, nr_class, w, C);
     double primal_obj = optim_vals.first + optim_vals.second;
     double dual_obj = sum_alpha - optim_vals.first;
-    if(iter == 0) dual_obj_init = dual_obj;
+    if(iter == 0) dual_gap_init = primal_obj- dual_obj;
     std::cout << primal_obj << "\n";
-    if(dual_obj < 0.001*dual_obj_init) break;
+    if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
     SW.resume();
 #endif
 
@@ -1331,7 +1331,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
 #ifdef TRACE_OPTIM_TRAJ
   stopwatch SW;
-  double dual_obj_init;
+  double dual_gap_init;
 #endif
   int i,s,j;
   int iter = 0;
@@ -1441,9 +1441,9 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
 
 
-  if(iter == 0) dual_obj_init = dual_obj;
+  if(iter == 0) dual_gap_init = primal_obj - dual_obj;
   std::cout << primal_obj << "\n";
-  if(dual_obj < 0.001*dual_obj_init) break;
+  if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
 
   SW.resume();
 
