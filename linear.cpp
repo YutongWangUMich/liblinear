@@ -1012,20 +1012,6 @@ void Solver_MCSVM_WW::Solve(double *w){
   // outer loop
   int iter = 0;
   while(iter<max_iter){
-#ifdef TRACE_OPTIM_TRAJ
-    SW.pause();
-    /* std::cout << "Time = " << SW.get_time() << " ms, "; */
-    std::cout << SW.get_time() << ",";
-    double sum_alpha = 0;
-    for(i=0;i<l;i++){
-      sum_alpha += alpha_block_sums[i];
-    }
-    std::cout << sum_alpha <<",";
-
-    double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
-    std::cout << primal_obj << "\n";
-    SW.resume();
-#endif
 
     // shuffle indices
 		for(i=0;i<l;i++)
@@ -1130,8 +1116,22 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
 
     }
-    iter++;
+#ifdef TRACE_OPTIM_TRAJ
+    SW.pause();
+    /* std::cout << "Time = " << SW.get_time() << " ms, "; */
+    std::cout << SW.get_time() << ",";
+    double sum_alpha = 0;
+    for(i=0;i<l;i++){
+      sum_alpha += alpha_block_sums[i];
+    }
+    std::cout << sum_alpha <<",";
 
+    double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
+    std::cout << primal_obj << "\n";
+    SW.resume();
+#endif
+
+    iter++;
   }
 
 	delete [] alpha;
@@ -1375,26 +1375,6 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
   // outer loop
   while(iter<max_iter){
-#ifdef TRACE_OPTIM_TRAJ
-    SW.pause();
-    std::cout << SW.get_time() << ",";
-
-  double sum_alpha = 0;
-	for(i=0;i<l;i++){
-    for(s = 0; s < nr_class; s++){
-      int y_i = (int)prob->y[i];
-      if(s == y_i) continue;
-      sum_alpha += alpha[i*nr_class+s];
-    }
-  }
-  std::cout << sum_alpha/4 <<",";
-
-  for(i=0;i<nr_class*w_size;i++) w[i] *= (0.5);
-  double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C/4);
-  std::cout << primal_obj << "\n";
-  for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
-  SW.resume();
-#endif
 
     // shuffle indices
 		for(i=0;i<l;i++)
@@ -1433,9 +1413,28 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
       }
 
     }
+#ifdef TRACE_OPTIM_TRAJ
+    SW.pause();
+    std::cout << SW.get_time() << ",";
+
+  double sum_alpha = 0;
+	for(i=0;i<l;i++){
+    for(s = 0; s < nr_class; s++){
+      int y_i = (int)prob->y[i];
+      if(s == y_i) continue;
+      sum_alpha += alpha[i*nr_class+s];
+    }
+  }
+  std::cout << sum_alpha/4 <<",";
+
+  for(i=0;i<nr_class*w_size;i++) w[i] *= (0.5);
+  double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C/4);
+  std::cout << primal_obj << "\n";
+  for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
+  SW.resume();
+#endif
+
     iter++;
-
-
   }
 	delete [] alpha;
   delete [] g;
