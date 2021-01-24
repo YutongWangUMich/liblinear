@@ -77,7 +77,8 @@ iters = {'usps':2048,\
 
 
 
-run_these_datasets = [2,1,7,5,3,10,6,11]
+# run_these_datasets = [2,1,7,5,3,10,6,11]
+run_these_datasets = [2,1,7,5,3]
 run_these_hyperparams = [10,1,0.1,0.01]
 
 
