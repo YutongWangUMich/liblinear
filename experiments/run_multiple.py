@@ -94,7 +94,8 @@ def run_experiment(dataset_name, regularizer, num_iterations, variant):
     else:
         print("Invalid variant")
         return
-    os.system('rm ' + FILENAME)
+    if os.path.isfile(FILENAME):
+        os.system('rm ' + FILENAME)
     os.system(COMMAND)
     
     
@@ -105,15 +106,6 @@ def get_exp_name(ds, reg):
 
 
 
-
-
-for C in run_these_hyperparams:
-    print(get_exp_name(dataset_names[0], C))
-
-    
-    
-    
-    
     
     
     
