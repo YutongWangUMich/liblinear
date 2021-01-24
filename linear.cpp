@@ -969,14 +969,12 @@ void Solver_MCSVM_WW::Solve(double *w){
   double * vSort = new double[nr_class-1];
   int * vIdx = new int[nr_class-1];
 
-  T_heap<bool> UpDnHeap(2*(nr_class-1));
-  T_heap<int> IdxHeap(nr_class-1);
-
-
   double * v_pos = new double[nr_class-1];
   int * v_pos_idx = new int[nr_class-1];
   int nv_pos;
 
+  T_heap<bool> UpDnHeap(2*(nr_class-1));
+  T_heap<int> IdxHeap(nr_class-1);
 
   const feature_node *xi;
 
@@ -1138,6 +1136,20 @@ void Solver_MCSVM_WW::Solve(double *w){
 #endif
   }
 
+	delete [] alpha;
+  delete [] alpha_block_sums;
+  
+	delete [] alpha_new;
+  delete [] del_alpha_pi;
+
+  delete [] x_sq_norms;
+  delete [] wxi;
+
+  delete [] vSort;
+  delete [] vIdx;
+
+  delete [] v_pos;
+  delete [] v_pos_idx;
 
 
 }
@@ -1319,16 +1331,18 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   int i,s,j;
   int iter = 0;
   int idx;
+
 	double *alpha =  new double[l*nr_class];
-  double *a; // a pointer to the current class
   double *g = new double[nr_class]; // the gradient
   double *mu = new double[nr_class];
-  double kkt;
-  double epsilon = 0.1 * MAX_KKT_VIOLATION;
-
   double * step = new double[nr_class];
   double *x_sq_norms = new double[l];
   double *wx = new double[nr_class];
+
+  double *a; // a pointer to the current class
+  double kkt;
+
+  double epsilon = 0.1 * MAX_KKT_VIOLATION;
 
   const feature_node *xi;
 
@@ -1354,7 +1368,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
 
 	// Initialize alpha
-	for(i=0;i<l*(nr_class-1);i++)
+	for(i=0;i<l*nr_class;i++)
 		alpha[i] = 0.0;
 
   // Initialize w
@@ -1402,6 +1416,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
     }
     iter++;
+
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
     std::cout << SW.get_time() << ",";
@@ -1422,7 +1437,14 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
   for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
   SW.resume();
 #endif
+
   }
+	delete [] alpha;
+  delete [] g;
+  delete [] mu;
+  delete [] step;
+  delete [] x_sq_norms;
+  delete [] wx;
 }
 
 
