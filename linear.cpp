@@ -649,7 +649,7 @@ double calc_WW_primal_obj(
       }
     }
   }
-  printf("norm: %f, hinge risk: %f, ", norm_w/2, C*WW_hinge_risk);
+  printf("%f,%f,", norm_w/2, C*WW_hinge_risk);
   return (norm_w/2) + C*WW_hinge_risk;
 }
 
@@ -1124,15 +1124,16 @@ void Solver_MCSVM_WW::Solve(double *w){
 
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
-    std::cout << "Time = " << SW.get_time() << " ms, ";
+    /* std::cout << "Time = " << SW.get_time() << " ms, "; */
+    std::cout << SW.get_time() << ",";
     double sum_alpha = 0;
     for(i=0;i<l;i++){
       sum_alpha += alpha_block_sums[i];
     }
-    std::cout << "sum of dual = " << sum_alpha <<", ";
+    std::cout << sum_alpha <<",";
 
     double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C);
-    std::cout << "Primal objective = " << primal_obj << "\n";
+    std::cout << primal_obj << "\n";
     SW.resume();
 #endif
   }
@@ -1403,7 +1404,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
     iter++;
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
-    std::cout << "Time = " << SW.get_time() << " ms, ";
+    std::cout << SW.get_time() << ",";
 
   double sum_alpha = 0;
 	for(i=0;i<l;i++){
@@ -1413,11 +1414,11 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
       sum_alpha += alpha[i*nr_class+s];
     }
   }
-  std::cout << "sum of dual = " << sum_alpha/4 <<", ";
+  std::cout << sum_alpha/4 <<",";
 
   for(i=0;i<nr_class*w_size;i++) w[i] *= (0.5);
   double primal_obj = calc_WW_primal_obj(prob, nr_class, w, C/4);
-  std::cout << "Primal objective = " << primal_obj << "\n";
+  std::cout << primal_obj << "\n";
   for(i=0;i<nr_class*w_size;i++) w[i] *= 2;
   SW.resume();
 #endif
