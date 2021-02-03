@@ -32,6 +32,7 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 #define MAX_KKT_VIOLATION 1e-5
 
 
+#define STOPPING_CRITERION 0.009
 
 #define TRACE_OPTIM_TRAJ
 
@@ -1121,20 +1122,19 @@ void Solver_MCSVM_WW::Solve(double *w){
 #ifdef TRACE_OPTIM_TRAJ
     SW.pause();
     double elapsed_time = SW.get_time();
-    std::cout << elapsed_time << ",";
+    std::cout << elapsed_time << ","; // TIME
     double sum_alpha = 0;
     for(i=0;i<l;i++){
       sum_alpha += alpha_block_sums[i];
     }
-    std::cout << sum_alpha <<",";
+    std::cout << sum_alpha <<","; // SUM OF ALPHA
 
     std::pair<double,double> optim_vals = calc_WW_primal_obj(prob, nr_class, w, C);
     double primal_obj = optim_vals.first + optim_vals.second;
     double dual_obj = sum_alpha - optim_vals.first;
     if(iter == 0) dual_gap_init = primal_obj- dual_obj;
-    std::cout << primal_obj << "\n";
-    if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
-    if(elapsed_time/1000 > 3600) break;
+    std::cout << primal_obj << "\n"; // PRIMAL OBJ
+    if((primal_obj - dual_obj) < STOPPING_CRITERION*dual_gap_init) break;
     SW.resume();
 #endif
 
@@ -1445,8 +1445,7 @@ void Solver_MCSVM_WW_Shark::Solve(double *w){
 
   if(iter == 0) dual_gap_init = primal_obj - dual_obj;
   std::cout << primal_obj << "\n";
-  if((primal_obj - dual_obj) < 0.001*dual_gap_init) break;
-  if((elapsed_time/1000) > 3600) break;
+  if((primal_obj - dual_obj) < STOPPING_CRITERION*dual_gap_init) break;
 
   SW.resume();
 

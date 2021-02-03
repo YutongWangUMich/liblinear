@@ -13,11 +13,6 @@ ds_metadata = pd.read_csv('dataset_metadata.csv')
 # |  7 | aloi.scale     |         1000 |         108000 |           128 | aloi         |
 # +----+----------------+--------------+----------------+---------------+--------------+
 
-value = input("This takes long. Are you sure you want to run? Type YES:\n")
-if(value != "YES"): 
-    quit()
-
-
 
 
 # all data sets
@@ -39,35 +34,12 @@ os.getcwd()
 
 
 
-def run_experiment(dataset_name, regularizer, num_iterations, variant):
-    expname = get_exp_name(dataset_name, regularizer)
-    if variant == "Ours":
-        FILENAME = 'results/Ours/' + expname
-        COMMAND = './train -s 30 -c ' + str(regularizer) + ' -t ' + str(num_iterations) + ' data/' + dataset_name + ' >> '+ FILENAME
-    elif variant == "Shark":
-        FILENAME = 'results/Shark/' + expname
-        COMMAND = './train -s 31 -c ' + str(regularizer) + ' -t ' + str(num_iterations) + ' data/' + dataset_name + ' >> '+ FILENAME
-    else:
-        print("Invalid variant")
-        return
-    if os.path.isfile(FILENAME):
-        os.system('rm ' + FILENAME)
-    os.system(COMMAND)
-    
-    FILENAME = 'accuracies/'+ variant +'/' + expname
-    if os.path.isfile(FILENAME):
-        os.system('rm ' + FILENAME)
-    TEST_COMMAND = './predict data/' + dataset_name + '.t ' + dataset_name + '.model output' + ' >> ' + FILENAME
-    os.system(TEST_COMMAND)
-
-
-    
+FILENAME = 'accuracies/diff_output'
+if os.path.isfile(FILENAME):
+    os.system('rm ' + FILENAME)
 
 
 
-    
-
-    
 import math
 
 def get_exp_name(ds, reg):
@@ -82,7 +54,8 @@ for i in datasets:
         ds = ds_metadata['ds_name'][i]
         print(ds)
         print(C)
-        print("Running Walrus")
-        run_experiment(ds, C, MAX_ITERS, "Ours")
-        print("Running Shark")
-        run_experiment(ds, C, MAX_ITERS, "Shark")
+        expname = get_exp_name(ds, C)
+
+        COMMAND = "diff accuracies/Ours/" + expname + " accuracies/Shark/" + expname + " >> accuracies/diff_output"
+        print(COMMAND)
+        os.system(COMMAND)

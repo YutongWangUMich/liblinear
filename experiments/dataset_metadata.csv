@@ -1,0 +1,9 @@
+ds_name,nr_classes,nr_instances,nr_features,short_name
+dna.scale,3,2000,180,dna
+satimage.scale,6,4435,36,satimage
+mnist.scale,10,60000,780,mnist
+news20.scale,20,15935,62061,news20
+letter.scale,26,15000,16,letter
+rcv1,53,15564,47236,rcv1
+sector.scale,105,6412,55197,sector
+aloi.scale,1000,81000,128,aloi

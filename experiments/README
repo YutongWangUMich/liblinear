@@ -1,0 +1,22 @@
+
+
++----+----------------+--------------+----------------+---------------+--------------+
+|    | ds_name        |   nr_classes |   nr_instances |   nr_features | short_name   |
+|----+----------------+--------------+----------------+---------------+--------------|
+|  0 | dna.scale      |            3 |           2000 |           180 | dna          |
+|  1 | satimage.scale |            6 |           4435 |            36 | satimage     |
+|  2 | mnist.scale    |           10 |          60000 |           780 | mnist        |
+|  3 | news20.scale   |           20 |          15935 |         62061 | news20       |
+|  4 | letter.scale   |           26 |          15000 |            16 | letter       |
+|  5 | rcv1           |           53 |          15564 |         47236 | rcv1         |
+|  6 | sector.scale   |          105 |           6412 |         55197 | sector       |
+|  7 | aloi.scale     |         1000 |         108000 |           128 | aloi         |
++----+----------------+--------------+----------------+---------------+--------------+
+
+Table generated using: 
+
+```python
+from tabulate import tabulate
+df = ds_metadata
+print(tabulate(df, headers='keys', tablefmt='psql'))
+```
