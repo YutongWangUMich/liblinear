@@ -34,8 +34,8 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 
 #define STOPPING_CRITERION 0.0009
 
-#define MEASURE_HEAP_SATURATION
-/* #define TRACE_OPTIM_TRAJ */
+/* #define MEASURE_HEAP_SATURATION */
+#define TRACE_OPTIM_TRAJ
 
 #ifdef TRACE_OPTIM_TRAJ
 struct stopwatch{
