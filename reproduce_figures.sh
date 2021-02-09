@@ -38,4 +38,5 @@ bunzip2 sector.scale.bz2
 wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/sector/sector.t.scale.bz2
 bunzip2 sector.t.scale.bz2
 mv sector.t.scale sector.scale.t
-cd experiments/run_multiple.py
+cd experiments
+python run_multiple.py
