@@ -10,14 +10,21 @@ make
 wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist.scale.bz2
 bunzip2 mnist.scale.bz2
 ./train -s 30 -c 1 -t 64 mnist.scale
-./predict data/mnist.scale.t mnist.scale.model output
 ```
 
 The `-s 30` flag is for choosing the Walrus solver for the linear WW-SVM.
+Alternatively, the `-s 31` flag is for choosing the [Shark](https://github.com/Shark-ML/Shark/) solver for the linear WW-SVM.
 The `-c 1` flag is for setting the regularizer to `1`.
 The `-t 64` sets the max outer iterations to 64.
 
-Alternatively, the `-s 31` flag is for choosing the [Shark](https://github.com/Shark-ML/Shark/) solver for the linear WW-SVM.
+To run the trained model on test set:
+```
+wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist.scale.t.bz2
+bunzip2 mnist.scale.t.bz2
+./predict mnist.scale.t mnist.scale.model output
+```
+
+
 
 
 # Stopping criterion
