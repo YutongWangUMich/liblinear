@@ -13,9 +13,9 @@ ds_metadata = pd.read_csv('dataset_metadata.csv')
 # |  7 | aloi.scale     |         1000 |         108000 |           128 | aloi         |
 # +----+----------------+--------------+----------------+---------------+--------------+
 
-value = input("This takes long. Are you sure you want to run? Type YES:\n")
-if(value != "YES"): 
-    quit()
+# value = input("This takes long. Are you sure you want to run? Type YES:\n")
+# if(value != "YES"): 
+#     quit()
 
 
 
