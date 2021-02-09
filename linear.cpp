@@ -34,7 +34,8 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 
 #define STOPPING_CRITERION 0.009
 
-#define TRACE_OPTIM_TRAJ
+#define MEASURE_HEAP_SATURATION
+/* #define TRACE_OPTIM_TRAJ */
 
 #ifdef TRACE_OPTIM_TRAJ
 struct stopwatch{
@@ -870,7 +871,15 @@ double Solver_MCSVM_WW::solve_sub_problem(
   vSort[nvSort] = IdxHeap.top().val;
   nvSort++;
 
+#ifdef MEASURE_HEAP_SATURATION
+  int niter = 0;
+#endif
+
   while(UpDnHeap.size()>0){
+#ifdef MEASURE_HEAP_SATURATION
+    niter++;
+#endif
+
     up = UpDnHeap.top().data;
     val = UpDnHeap.top().val;
 
@@ -899,19 +908,6 @@ double Solver_MCSVM_WW::solve_sub_problem(
 
     num_dn = nr_class - 1 - num_up - num_mi;
 
-#ifdef DIAGNOSTIC2
-    std::cout<<"gamma: " << gamma << "\n";
-    std::cout<<"num_up: " << num_up << ", num_mi: " << num_mi << ", num_dn :" << num_dn << "\n";
-    /* std::cout<<"upper_mid: " << vId[num_up].val << ", lower_mid: " << vId[num_up+num_mi-1].val; */
-    /* std::cout<<", upper_dn: " << vId[num_up+num_mi].val; */
-    /* std::cout<<"\n"; */
-    std::cout<<"upper_mid: " << vSort[num_up] << ", lower_mid: " << vSort[num_up+num_mi-1];
-    std::cout<<", upper_dn: " << vSort[num_up+num_mi];
-    std::cout<<"\n";
-    std::cout <<"nvSort: " << nvSort << ", ";
-    std::cout <<"nvIdx: " << nvIdx;
-    std::cout<<"\n";
-#endif
 
     bool kkt = 1;
 
@@ -940,7 +936,9 @@ double Solver_MCSVM_WW::solve_sub_problem(
         }
         beta[vIdx[j]] = beta_val;
       }
-      /* std::cout << num_up+num_mi << std::endl; */
+#ifdef MEASURE_HEAP_SATURATION
+      std::cout << niter << std::endl;
+#endif
       return C*num_up + sum_v_mi - gamma * num_mi;
     }
   }
@@ -1005,10 +1003,6 @@ void Solver_MCSVM_WW::Solve(double *w){
 	for(i=0;i<l*(nr_class-1);i++)
 		alpha[i] = 0;
 
-  /* printf("Number of features: %d\n", w_size); */
-  // Initialize w
-  // We will use the last k-1 columns of w to store the reduced classifier
-  // The first column will be left as all zeros until the program finishes running
 	for(i=0;i<w_size*nr_class;i++)
 		w[i] = 0;
 
@@ -1076,29 +1070,17 @@ void Solver_MCSVM_WW::Solve(double *w){
       }
 
 
-#ifdef DIAGNOSTIC2
-      std::cout << "Iteration: " << j << std::endl;
-      std::cout << "nr_class: " << nr_class << std::endl;
-      std::cout << "v: " << std::endl;
-      print_array(v,nr_class-1);
-
-      std::cout << "UpDnHeap: " << std::endl;
-      UpDnHeap.print_state();
-      std::cout << "IdxHeap: " << std::endl;
-      IdxHeap.print_state();
-#endif
 
 
       if(IdxHeap.size()>0){
+/* #ifdef MEASURE_HEAP_SATURATION */
+/*         std::cout<<IdxHeap.size() << ", "; */
+/* #endif */
         alpha_block_sums[i] = solve_sub_problem(UpDnHeap, IdxHeap, vSort, vIdx, alpha_new);
       }else{
         alpha_block_sums[i] = 0;
       }
 
-#ifdef DIAGNOSTIC2
-      std::cout << "alpha_new: " << std::endl;
-      print_array(alpha_new, nr_class-1);
-#endif
 
       del_alpha_pi[0] = 0;
       for(s=0;s<nr_class-1;s++){
