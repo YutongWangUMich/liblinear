@@ -32,7 +32,7 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 #define MAX_KKT_VIOLATION 1e-5
 
 
-#define STOPPING_CRITERION 0.009
+#define STOPPING_CRITERION 0.0009
 
 #define MEASURE_HEAP_SATURATION
 /* #define TRACE_OPTIM_TRAJ */
