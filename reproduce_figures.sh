@@ -1,3 +1,4 @@
+make
 mkdir data
 mkdir accuracies
 mkdir accuracies/Ours
