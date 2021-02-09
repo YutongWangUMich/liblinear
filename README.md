@@ -2,17 +2,22 @@ This is the repository that accompanies the manuscript:
 
 # Basic usage
 
-To run the Walrus solver for the WW-SVM:
-`./train -s 30 -c REGULARIZER -t MAX_ITERATION data/mnist.scale`
-
-
-For example, to train the WW-SVM on `mnist.scale` -- downloadable from [LIBSVM Data: Classification (Multi-class)
+To train the WW-SVM on `mnist.scale` -- downloadable from [LIBSVM Data: Classification (Multi-class)
 ](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html)
+
 ```
-./train -s 30 -c 1 -t 64 data/mnist.scale
+make
+wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass/mnist.scale.bz2
+bunzip2 mnist.scale.bz2
+./train -s 30 -c 1 -t 64 mnist.scale
 ./predict data/mnist.scale.t mnist.scale.model output
 ```
 
+The `-s 30` flag is for choosing the Walrus solver for the linear WW-SVM.
+The `-c 1` flag is for setting the regularizer to `1`.
+The `-t 64` sets the max outer iterations to 64.
+
+Alternatively, the `-s 31` flag is for choosing the [Shark](https://github.com/Shark-ML/Shark/) solver for the linear WW-SVM.
 
 
 # Stopping criterion
