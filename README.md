@@ -46,5 +46,19 @@ chmod +x reproduce_figures.sh
 ./reproduce_figures.sh
 ```
 
-This script will download all the datasets. After the above script finishes, go to the Jupyter notebook `experiments/analyze.ipynb` and hit run all.
+This script performs the following:
+1. Download all the datasets 
+2. Run the Walrus and Shark solver on each dataset over the hyperparameter grid of size 10 `[2^(-6), 2^(-5),...,2^(3)]`.
+
+After the above script finishes, make sure the following Python packages are installed:
+
+```
+pandas
+numpy
+matplotlib
+seaborn
+re
+```
+
+Finally, go to the Jupyter notebook `experiments/analyze.ipynb` and hit run all.
 
