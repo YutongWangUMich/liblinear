@@ -1,9 +1,9 @@
-This is the repository that accompanies the manuscript:
+This is the repository that accompanies the manuscript ["An exact solver for the Weston-Watkins SVM subproblem"](https://arxiv.org/abs/2102.05640).
 
 # Basic usage
 
 To train the WW-SVM on `mnist.scale` -- downloadable from [LIBSVM Data: Classification (Multi-class)
-](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html)
+](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/multiclass.html) -- run the following in console:
 
 ```
 make
